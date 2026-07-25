@@ -64,14 +64,15 @@ UPDATE "plan"
     'plan-vitalidad-mensual'
   );
 
--- ── 4. Horarios del estudio: matutino 07–11 y vespertino 17–21, Lun a Sáb ─────
+-- ── 4. Horarios: matutino 07–11 y vespertino 17–21; el sábado sólo matutino ──
 
 -- Los horarios fuera de la parrilla oficial se ocultan (no se borran: pueden
 -- tener reservas históricas asociadas).
 UPDATE "schedule_slot"
   SET "is_active" = false
   WHERE "day_of_week" NOT BETWEEN 1 AND 6
-     OR "start_time" NOT IN ('07:00','08:00','09:00','10:00','17:00','18:00','19:00','20:00');
+     OR "start_time" NOT IN ('07:00','08:00','09:00','10:00','17:00','18:00','19:00','20:00')
+     OR ("day_of_week" = 6 AND "start_time" >= '12:00');
 
 INSERT INTO "schedule_slot" ("id","class_name","instructor","alternate_instructor","schedule_mode","day_of_week","start_time","end_time","capacity","class_type","is_active","created_at")
 SELECT
@@ -98,6 +99,8 @@ CROSS JOIN (VALUES
   ('19:00','20:00'),
   ('20:00','21:00')
 ) AS t(start_time, end_time)
+-- El sábado sólo abre por la mañana.
+WHERE NOT (d.day_of_week = 6 AND t.start_time >= '12:00')
 ON CONFLICT ("id") DO UPDATE SET
   "class_name" = EXCLUDED."class_name",
   "day_of_week" = EXCLUDED."day_of_week",

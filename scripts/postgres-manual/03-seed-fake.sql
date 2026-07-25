@@ -124,6 +124,8 @@ CROSS JOIN (VALUES
   ('19:00','20:00'),
   ('20:00','21:00')
 ) AS t(start_time, end_time)
+-- El sábado sólo abre por la mañana.
+WHERE NOT (d.day_of_week = 6 AND t.start_time >= '12:00')
 ON CONFLICT ("id") DO UPDATE SET "instructor" = EXCLUDED."instructor", "is_active" = true;
 
 -- ── 7. subscription ───────────────────────────────────────────────────────────

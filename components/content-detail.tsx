@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { FaClock, FaHeart, FaMoon, FaSun } from "react-icons/fa6";
 
 const morningSlots = [
@@ -34,9 +35,14 @@ export default function ContentDetail() {
           transition={{ duration: 0.6 }}
           className="relative overflow-hidden rounded-card h-90 md:h-120 border border-black/10 bg-[#d8cfc2] shadow-[0_25px_50px_rgba(27,26,24,0.15)]"
         >
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('${HORARIOS_BG}')` }}
+          {/* next/image en vez de background-image: sirve AVIF/WebP al tamaño
+              real del hueco y carga en diferido. El original pesa 5 MB. */}
+          <Image
+            src={HORARIOS_BG}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
           <div className="relative flex h-full flex-col justify-between p-6 text-white">

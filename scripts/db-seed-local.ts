@@ -71,8 +71,12 @@ function main() {
       .run()
   }
 
+  let slotsSeeded = 0
   for (const day of scheduleDayLabels) {
     for (const startTime of scheduleTimes) {
+      // El sábado sólo abre el turno matutino.
+      if (day.dayOfWeek === 6 && startTime >= "12:00") continue
+      slotsSeeded++
       const isDual = day.dayOfWeek === 6 && startTime === "08:00"
       const values = {
         id: `slot-d${day.dayOfWeek}-t${startTime.replace(":", "")}`,
@@ -100,7 +104,7 @@ function main() {
 
   console.log(
     `local.db listo: ${STUDIO_PLAN_DEFINITIONS.length} planes sembrados (${count("plan")} en total), ` +
-      `${scheduleDayLabels.length * scheduleTimes.length} horarios sembrados (${count("schedule_slot")} en total).`,
+      `${slotsSeeded} horarios sembrados (${count("schedule_slot")} en total).`,
   )
   raw.close()
 }

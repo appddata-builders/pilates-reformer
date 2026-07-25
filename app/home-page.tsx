@@ -392,10 +392,16 @@ export function HomePage(props: { plans: PublicPlan[] }) {
                         variants={fadeUp}
                         className="grid grid-cols-1 gap-3 overflow-hidden lg:rounded-card border border-black/10 bg-white/90 shadow-[0_20px_40px_rgba(27,26,24,0.08)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:min-h-[28rem]"
                       >
-                        <div className="relative aspect-5/4 w-full overflow-hidden lg:aspect-auto lg:h-full lg:self-stretch">
-                          <div
-                            className="absolute inset-0 bg-[#d8cfc2] bg-cover bg-center"
-                            style={{ backgroundImage: `url('${image}')` }}
+                        <div className="relative aspect-5/4 w-full overflow-hidden bg-[#d8cfc2] lg:aspect-auto lg:h-full lg:self-stretch">
+                          {/* next/image en vez de background-image: AVIF/WebP al
+                              tamaño real y carga diferida. Los originales pesan
+                              entre 1.8 y 2.8 MB cada uno. */}
+                          <Image
+                            src={image}
+                            alt=""
+                            fill
+                            sizes="(min-width: 1024px) 50vw, 100vw"
+                            className="object-cover"
                           />
                         </div>
                         <div className="flex flex-col justify-between gap-6 p-4 sm:p-6">
@@ -464,9 +470,17 @@ export function HomePage(props: { plans: PublicPlan[] }) {
                     className="flex items-center justify-between lg:rounded-card border border-black/10 bg-white/80 px-6 py-5"
                   >
                     <p className="eyebrow eyebrow-muted">{plan.name}</p>
-                    <p className="text-2xl font-semibold text-green-base">
-                      {plan.prices[0].priceLabel}
-                    </p>
+                    <div className="flex items-center gap-4">
+                      <p className="text-2xl font-semibold text-green-base">
+                        {plan.prices[0].priceLabel}
+                      </p>
+                      <Link
+                        href={`${routes.registry}?plan=${plan.prices[0].planId}`}
+                        className="inline-flex shrink-0 items-center justify-center rounded-full bg-green-base px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-hover"
+                      >
+                        Adquirir Clase
+                      </Link>
+                    </div>
                   </motion.div>
                 ))}
               </>
@@ -589,10 +603,10 @@ export function HomePage(props: { plans: PublicPlan[] }) {
                 </div>
               </div>
               <Link
-                href={routes.cuenta}
+                href={routes.registry}
                 className="rounded-full bg-green-base px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-green-base/20 transition hover:-translate-y-0.5 hover:bg-green-hover"
               >
-                Ver cuenta
+                Crear cuenta
               </Link>
             </motion.div>
           </motion.div>
