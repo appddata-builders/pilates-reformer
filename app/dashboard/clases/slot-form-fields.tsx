@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Input } from "@/components/shared/ui/input"
 import { Label } from "@/components/shared/ui/label"
 import { endTimeFromStart } from "@/lib/time-utils"
+import { STUDIO_CLASS_CAPACITY } from "@/lib/site/schedule"
 
 const DAY_OPTIONS = [
   { value: "0", label: "Domingo" },
@@ -218,7 +219,7 @@ export function SlotFormFields(props: {
           min={1}
           max={100}
           required
-          defaultValue={v?.capacity ?? 8}
+          defaultValue={v?.capacity ?? STUDIO_CLASS_CAPACITY}
         />
         {err?.capacity ? <p className="text-destructive text-sm">{err.capacity[0]}</p> : null}
       </div>

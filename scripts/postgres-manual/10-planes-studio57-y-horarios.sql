@@ -16,6 +16,7 @@ UPDATE "plan"
 -- ── 2. Plan Equilibrio (3 clases/semana) y Plan Vitalidad (5 clases/semana) ───
 
 INSERT INTO "plan" ("id","name","plan_type","days_per_week","total_classes","price_mxn","cost_per_class","duration_days","is_active","is_public","is_add_on","is_unlimited","created_at") VALUES
+('plan-individual','Clase Individual','class_pack',0,1,140,140,30,true,true,false,false,now()),
 ('plan-equilibrio-semanal','Plan Equilibrio Semanal','monthly',3,NULL,400,133.33,7,true,true,false,false,now()),
 ('plan-equilibrio-quincenal','Plan Equilibrio Quincenal','monthly',3,NULL,700,116.67,15,true,true,false,false,now()),
 ('plan-equilibrio-mensual','Plan Equilibrio Mensual','monthly',3,NULL,1350,112.5,30,true,true,false,false,now()),
@@ -41,6 +42,7 @@ UPDATE "plan"
   SET "is_public" = false
   WHERE "id" NOT IN (
     'plan-apertura',
+    'plan-individual',
     'plan-equilibrio-semanal',
     'plan-equilibrio-quincenal',
     'plan-equilibrio-mensual',
@@ -53,6 +55,7 @@ UPDATE "plan"
   SET "is_public" = true
   WHERE "id" IN (
     'plan-apertura',
+    'plan-individual',
     'plan-equilibrio-semanal',
     'plan-equilibrio-quincenal',
     'plan-equilibrio-mensual',
@@ -80,7 +83,7 @@ SELECT
   d.day_of_week,
   t.start_time,
   t.end_time,
-  8,
+  10,
   'reformer',
   true,
   now()

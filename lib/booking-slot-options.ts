@@ -33,10 +33,10 @@ export function filterSlotsForBookingDate(
   })
 }
 
+/** La alumna elige por horario: el coach no se muestra al reservar. */
 export function formatSlotLabel(slot: BookingSlotOption): string {
   const end = slot.endTime ? ` – ${formatTime12h(slot.endTime)}` : ""
-  const coach = slot.instructor ? ` · ${slot.instructor}` : ""
-  return `${slot.className} · ${formatTime12h(slot.startTime)}${end}${coach}`
+  return `${slot.className} · ${formatTime12h(slot.startTime)}${end}`
 }
 
 export function toLocalDateStr(d: Date): string {

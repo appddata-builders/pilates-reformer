@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS "schedule_slot" (
 	"day_of_week" integer NOT NULL,
 	"start_time" text NOT NULL,
 	"end_time" text,
-	"capacity" integer DEFAULT 8 NOT NULL,
+	"capacity" integer DEFAULT 10 NOT NULL,
 	"class_type" text DEFAULT 'reformer' NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp (3) DEFAULT now() NOT NULL
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS "studio_policy" (
 	"id" text PRIMARY KEY DEFAULT 'main' NOT NULL,
 	"studio_name" text DEFAULT 'Pilates Studio' NOT NULL,
 	"logo_url" text,
-	"max_capacity" integer DEFAULT 8 NOT NULL,
+	"max_capacity" integer DEFAULT 10 NOT NULL,
 	"cancel_hours" integer DEFAULT 1 NOT NULL,
 	"cancel_minutes" integer DEFAULT 90 NOT NULL,
 	"alert_last_class_threshold" integer DEFAULT 2 NOT NULL,

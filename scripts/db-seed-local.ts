@@ -14,7 +14,11 @@ import Database from "better-sqlite3"
 import { drizzle } from "drizzle-orm/better-sqlite3"
 import * as schema from "../lib/db/schema.sqlite"
 import { STUDIO_PLAN_DEFINITIONS } from "../lib/site/plans"
-import { scheduleDayLabels, scheduleTimes } from "../lib/site/schedule"
+import {
+  STUDIO_CLASS_CAPACITY,
+  scheduleDayLabels,
+  scheduleTimes,
+} from "../lib/site/schedule"
 
 const MORNING_INSTRUCTOR = "Elena Morales"
 const EVENING_INSTRUCTOR = "Lucía Paredes"
@@ -79,7 +83,7 @@ function main() {
         dayOfWeek: day.dayOfWeek,
         startTime,
         endTime: nextHour(startTime),
-        capacity: 8,
+        capacity: STUDIO_CLASS_CAPACITY,
         classType: "reformer",
         isActive: true,
         createdAt: now,

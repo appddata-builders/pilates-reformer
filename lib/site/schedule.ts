@@ -8,6 +8,9 @@ export type PublicScheduleSlot = ScheduleSlot & {
   capacity: number
 }
 
+/** Aforo del estudio: 10 lugares por clase. */
+export const STUDIO_CLASS_CAPACITY = 10
+
 export const scheduleDayLabels = [
   { dayOfWeek: 1, label: "Lun" },
   { dayOfWeek: 2, label: "Mar" },

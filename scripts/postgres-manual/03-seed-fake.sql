@@ -57,7 +57,7 @@ ON CONFLICT ("id") DO UPDATE SET "password" = EXCLUDED."password", "updated_at" 
 -- ── 3. studio_policy ──────────────────────────────────────────────────────────
 
 INSERT INTO "studio_policy" ("id","studio_name","brand_color","max_capacity","cancel_hours","cancel_minutes","alert_last_class_threshold","alert_days_before_expiry","maintenance_mode","updated_at")
-VALUES ('main','Pilates Studio','#1b2d6e',8,1,90,2,3,false,now())
+VALUES ('main','Pilates Studio','#1b2d6e',10,1,90,2,3,false,now())
 ON CONFLICT ("id") DO UPDATE SET "studio_name" = EXCLUDED."studio_name", "updated_at" = now();
 
 -- ── 4. plan ───────────────────────────────────────────────────────────────────
@@ -66,6 +66,7 @@ ON CONFLICT ("id") DO UPDATE SET "studio_name" = EXCLUDED."studio_name", "update
 -- de Equilibrio y Vitalidad (semanal = 7 días, quincenal = 15, mensual = 30).
 INSERT INTO "plan" ("id","name","plan_type","days_per_week","total_classes","price_mxn","cost_per_class","duration_days","is_active","is_public","is_add_on","is_unlimited","created_at") VALUES
 ('plan-apertura','Clase Muestra','class_pack',0,1,0,0,30,true,true,false,false,now()),
+('plan-individual','Clase Individual','class_pack',0,1,140,140,30,true,true,false,false,now()),
 ('plan-equilibrio-semanal','Plan Equilibrio Semanal','monthly',3,NULL,400,133.33,7,true,true,false,false,now()),
 ('plan-equilibrio-quincenal','Plan Equilibrio Quincenal','monthly',3,NULL,700,116.67,15,true,true,false,false,now()),
 ('plan-equilibrio-mensual','Plan Equilibrio Mensual','monthly',3,NULL,1350,112.5,30,true,true,false,false,now()),
@@ -108,7 +109,7 @@ SELECT
   d.day_of_week,
   t.start_time,
   t.end_time,
-  8,
+  10,
   'reformer',
   true,
   now()

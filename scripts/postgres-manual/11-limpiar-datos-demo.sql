@@ -16,6 +16,7 @@ CREATE TEMP TABLE demo_user ON COMMIT DROP AS
 CREATE TEMP TABLE doomed_plan ON COMMIT DROP AS
   SELECT id FROM "plan" WHERE id NOT IN (
     'plan-apertura',
+    'plan-individual',
     'plan-equilibrio-semanal',
     'plan-equilibrio-quincenal',
     'plan-equilibrio-mensual',

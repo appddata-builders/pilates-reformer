@@ -14,6 +14,18 @@ export type StudioPlanDefinition = {
 
 export const STUDIO_PLAN_DEFINITIONS: StudioPlanDefinition[] = [
   {
+    id: "plan-individual",
+    name: "Clase Individual",
+    planType: "class_pack",
+    daysPerWeek: 0,
+    totalClasses: 1,
+    priceMxn: 140,
+    durationDays: 30,
+    isAddOn: false,
+    isUnlimited: false,
+    isPublic: true,
+  },
+  {
     id: "plan-apertura",
     name: "Clase Muestra",
     planType: "class_pack",

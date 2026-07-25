@@ -340,12 +340,14 @@ export function HomePage(props: { plans: PublicPlan[] }) {
             className="relative flex min-h-105 scroll-mt-40 flex-col gap-4 rounded-card border border-white/15 bg-white/10 p-5 text-white shadow-[0_25px_60px_rgba(27,26,24,0.18)] backdrop-blur sm:p-6 lg:min-h-[480px]"
           >
             <SetupWeeklySchedule onSelectClass={goToAgendar} />
-            <Link
-              href={routes.agendar}
+            {/* <a> plano como en el navbar: con <Link> la segunda vez la URL ya
+                es #planes y Next no vuelve a desplazar. */}
+            <a
+              href="#planes"
               className="shrink-0 cursor-pointer rounded-full bg-white px-5 py-3 text-center text-sm font-semibold text-[#1b1a18] shadow-lg shadow-black/30 transition hover:-translate-y-0.5"
             >
-              Ir a agendar
-            </Link>
+              Agendar
+            </a>
           </motion.div>
         </div>
       </header>
@@ -444,7 +446,7 @@ export function HomePage(props: { plans: PublicPlan[] }) {
                             </div>
                           </div>
                           <Link
-                            href={`${routes.login}?plan=${activePrice.planId}`}
+                            href={`${routes.registry}?plan=${activePrice.planId}`}
                             className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover"
                           >
                             Adquirir Plan
@@ -461,7 +463,7 @@ export function HomePage(props: { plans: PublicPlan[] }) {
                     variants={fadeUp}
                     className="flex items-center justify-between lg:rounded-card border border-black/10 bg-white/80 px-6 py-5"
                   >
-                    <p className="eyebrow eyebrow-muted">{plan.badge ?? plan.name}</p>
+                    <p className="eyebrow eyebrow-muted">{plan.name}</p>
                     <p className="text-2xl font-semibold text-green-base">
                       {plan.prices[0].priceLabel}
                     </p>
