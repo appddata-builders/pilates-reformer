@@ -7,10 +7,14 @@ import { toLocalDateStr } from "@/lib/booking-slot-options"
 import { getMondayOfWeek, type PublicScheduleSlot } from "@/lib/site/schedule"
 import { normalizeScheduleTime } from "@/lib/site/schedule-board-utils"
 import { listDisabledSlotDateKeys } from "@/lib/slot-exceptions"
+import { DEFAULT_BOOKING_WINDOW_MINUTES } from "@/lib/booking-rules"
+
 export type LandingScheduleBoard = {
   slots: PublicScheduleSlot[]
   enrollments: Record<string, number>
   disabledSlotDateKeys: string[]
+  /** Minutos antes del fin de clase en que deja de poder reservarse. */
+  bookingWindowMinutes: number
 }
 
 function enrollmentKey(slotId: string, dateStr: string) {
@@ -25,19 +29,26 @@ export async function loadLandingScheduleBoard(): Promise<LandingScheduleBoard> 
         id: schema.scheduleSlot.id,
         dayOfWeek: schema.scheduleSlot.dayOfWeek,
         startTime: schema.scheduleSlot.startTime,
+        endTime: schema.scheduleSlot.endTime,
         capacity: schema.scheduleSlot.capacity,
       })
       .from(schema.scheduleSlot)
       .where(eq(schema.scheduleSlot.isActive, true))
 
     if (rows.length === 0) {
-      return { slots: [], enrollments: {}, disabledSlotDateKeys: [] }
+      return {
+        slots: [],
+        enrollments: {},
+        disabledSlotDateKeys: [],
+        bookingWindowMinutes: DEFAULT_BOOKING_WINDOW_MINUTES,
+      }
     }
 
     const slots: PublicScheduleSlot[] = rows.map((row) => ({
       id: row.id,
       dayOfWeek: row.dayOfWeek,
       startTime: normalizeScheduleTime(row.startTime),
+      endTime: row.endTime == null ? null : normalizeScheduleTime(row.endTime),
       capacity: row.capacity,
     }))
 
@@ -74,8 +85,24 @@ export async function loadLandingScheduleBoard(): Promise<LandingScheduleBoard> 
       await listDisabledSlotDateKeys(db, rangeStart, rangeEnd),
     )
 
-    return { slots, enrollments, disabledSlotDateKeys }
+    const [policy] = await db
+      .select({ bookingWindowMinutes: schema.studioPolicy.bookingWindowMinutes })
+      .from(schema.studioPolicy)
+      .limit(1)
+
+    return {
+      slots,
+      enrollments,
+      disabledSlotDateKeys,
+      bookingWindowMinutes:
+        policy?.bookingWindowMinutes ?? DEFAULT_BOOKING_WINDOW_MINUTES,
+    }
   } catch {
-    return { slots: [], enrollments: {}, disabledSlotDateKeys: [] }
+    return {
+      slots: [],
+      enrollments: {},
+      disabledSlotDateKeys: [],
+      bookingWindowMinutes: DEFAULT_BOOKING_WINDOW_MINUTES,
+    }
   }
 }

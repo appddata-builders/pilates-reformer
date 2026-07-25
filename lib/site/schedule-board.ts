@@ -1,4 +1,6 @@
 import { scheduleTimes, type ScheduleSlot } from "@/lib/site/schedule"
+import { evaluateBookingTimeWindow } from "@/lib/booking-rules"
+import { endTimeFromStart } from "@/lib/time-utils"
 
 export function normalizeScheduleTime(value: string): string {
   const parts = value.trim().split(":")
@@ -64,12 +66,37 @@ export function isBoardSlotFull(enrolled: number, capacity: number): boolean {
   return enrolled >= capacity
 }
 
+/**
+ * Una celda "ya pasó" cuando el servidor rechazaría la reserva por tiempo:
+ * faltan menos de `bookingWindowMinutes` para que la clase termine
+ * (misma regla que evaluateBookingAllowed en createBookingForUser).
+ */
+export function isBoardSlotPast(params: {
+  dateStr: string
+  startTime: string
+  endTime?: string | null
+  bookingWindowMinutes: number
+  now?: Date
+}): boolean {
+  const now = params.now ?? new Date()
+  const end = params.endTime ?? endTimeFromStart(params.startTime)
+  const classEnd = new Date(`${params.dateStr}T${normalizeScheduleTime(end)}:00`)
+  if (Number.isNaN(classEnd.getTime())) return false
+  return !evaluateBookingTimeWindow({
+    now,
+    classEnd,
+    bookingWindowMinutes: params.bookingWindowMinutes,
+  }).ok
+}
+
 export function canOpenBookingFromBoard(params: {
   enrolled: number
   capacity: number
   disabled: boolean
+  past?: boolean
 }): boolean {
   if (params.disabled) return false
+  if (params.past) return false
   if (isBoardSlotFull(params.enrolled, params.capacity)) return false
   return true
 }

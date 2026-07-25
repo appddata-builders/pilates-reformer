@@ -16,7 +16,9 @@ import {
   getBoardTimes,
   isBoardSlotDisabled,
   isBoardSlotFull,
+  isBoardSlotPast,
 } from "@/lib/site/schedule-board"
+import { DEFAULT_BOOKING_WINDOW_MINUTES } from "@/lib/booking-rules"
 import { loadWeeklyBoardAction } from "@/app/agendar/actions"
 
 function dateStrForWeekDay(monday: Date, dayOfWeek: number): string {
@@ -42,6 +44,9 @@ export default function SetupWeeklySchedule({
   const [slots, setSlots] = useState<PublicScheduleSlot[]>([])
   const [enrollments, setEnrollments] = useState<Record<string, number>>({})
   const [disabledSlotDateKeys, setDisabledSlotDateKeys] = useState<string[]>([])
+  const [bookingWindowMinutes, setBookingWindowMinutes] = useState(
+    DEFAULT_BOOKING_WINDOW_MINUTES,
+  )
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -53,6 +58,7 @@ export default function SetupWeeklySchedule({
         setSlots(board.slots)
         setEnrollments(board.enrollments)
         setDisabledSlotDateKeys(board.disabledSlotDateKeys)
+        setBookingWindowMinutes(board.bookingWindowMinutes)
         setLoading(false)
       })
       .catch(() => {
@@ -67,6 +73,9 @@ export default function SetupWeeklySchedule({
     }
   }, [])
 
+  // Las semanas ya transcurridas no son reservables: el tablero arranca en la
+  // semana en curso y no deja retroceder más allá.
+  const canGoToPreviousWeek = weekOffset > 0
   const monday = getMondayOfWeek(new Date(), weekOffset)
   const weekLabel = formatWeekRange(monday)
   const boardTimes = getBoardTimes(slots)
@@ -107,8 +116,18 @@ export default function SetupWeeklySchedule({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setWeekOffset(weekOffset - 1)}
-              className="grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-white/10 text-white transition hover:bg-white/20"
+              onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))}
+              disabled={!canGoToPreviousWeek}
+              title={
+                canGoToPreviousWeek
+                  ? "Semana anterior"
+                  : "Las semanas ya transcurridas no se pueden reservar"
+              }
+              className={`grid h-8 w-8 place-items-center rounded-full border border-white/25 transition ${
+                canGoToPreviousWeek
+                  ? "bg-white/10 text-white hover:bg-white/20"
+                  : "cursor-not-allowed bg-white/5 text-white/30"
+              }`}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -179,17 +198,26 @@ export default function SetupWeeklySchedule({
                         slot.id,
                         bookingDate,
                       )
+                      const past = isBoardSlotPast({
+                        dateStr: bookingDate,
+                        startTime: slot.startTime,
+                        endTime: slot.endTime,
+                        bookingWindowMinutes,
+                      })
                       const full = isBoardSlotFull(enrolled, slot.capacity)
                       const canBook = canOpenBookingFromBoard({
                         enrolled,
                         capacity: slot.capacity,
                         disabled,
+                        past,
                       })
-                      const title = disabled
-                        ? "No disponible esta semana"
-                        : full
-                          ? "Clase llena"
-                          : `${enrolled} inscritos · aforo ${slot.capacity}`
+                      const title = past
+                        ? "Esta clase ya pasó"
+                        : disabled
+                          ? "No disponible esta semana"
+                          : full
+                            ? "Clase llena"
+                            : `${enrolled} inscritos · aforo ${slot.capacity}`
 
                       return (
                         <td
@@ -204,18 +232,22 @@ export default function SetupWeeklySchedule({
                             className={`relative inline-flex h-7 min-w-[3.25rem] items-center justify-center rounded-md px-2 text-[10px] font-bold transition sm:h-8 sm:text-xs ${
                               canBook
                                 ? "cursor-pointer bg-green-base text-white hover:bg-green-hover"
-                                : "cursor-not-allowed bg-white/20 text-white/60 line-through"
+                                : past
+                                  ? "cursor-not-allowed bg-white/5 text-white/25"
+                                  : "cursor-not-allowed bg-white/20 text-white/60 line-through"
                             }`}
                           >
                             {disabled ? "Off" : full ? "Llena" : "Clase"}
                             {disabled ? null : (
                               <span
                                 className={`absolute -top-1.5 -right-2 flex h-4 min-w-[1.65rem] items-center justify-center rounded-full px-1 text-[8px] font-bold leading-none sm:text-[9px] ${
-                                  enrolled > 0
-                                    ? full
-                                      ? "bg-red-600 text-white"
-                                      : "bg-red-500 text-white"
-                                    : "bg-white/30 text-white"
+                                  past
+                                    ? "bg-white/10 text-white/30"
+                                    : enrolled > 0
+                                      ? full
+                                        ? "bg-red-600 text-white"
+                                        : "bg-red-500 text-white"
+                                      : "bg-white/30 text-white"
                                 }`}
                               >
                                 {enrolled}/{slot.capacity}

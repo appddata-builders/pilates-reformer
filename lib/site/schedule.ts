@@ -6,6 +6,8 @@ export type ScheduleSlot = {
 export type PublicScheduleSlot = ScheduleSlot & {
   id: string
   capacity: number
+  /** Necesaria para saber si la clase ya pasó; si falta se asume 1 hora. */
+  endTime?: string | null
 }
 
 /** Aforo del estudio: 10 lugares por clase. */
