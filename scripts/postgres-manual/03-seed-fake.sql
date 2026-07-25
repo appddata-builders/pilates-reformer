@@ -62,17 +62,23 @@ ON CONFLICT ("id") DO UPDATE SET "studio_name" = EXCLUDED."studio_name", "update
 
 -- ── 4. plan ───────────────────────────────────────────────────────────────────
 
-INSERT INTO "plan" ("id","name","plan_type","days_per_week","total_classes","price_mxn","cost_per_class","duration_days","is_active","is_add_on","is_unlimited","created_at") VALUES
-('plan-apertura','Clase de Apertura','class_pack',0,1,0,0,30,true,false,false,now()),
-('plan-descubre','Clase Descubre','class_pack',0,1,270,270,30,true,false,false,now()),
-('plan-inicia','Inicia tu camino','class_pack',0,4,950,237.5,30,true,false,false,now()),
-('plan-conecta','Conecta y Fortalece','class_pack',0,8,1600,200,30,true,false,false,now()),
-('plan-activa','Activa tu grandeza interior','class_pack',0,12,2000,166.67,30,true,false,false,now()),
-('plan-reinventa','Reinventa tu ser','class_pack',0,20,2700,135,30,true,false,false,now()),
-('plan-privada','Clase Privada','add_on',0,1,500,500,30,true,true,false,now())
+-- Los únicos planes de Studio 57: Clase Muestra y las tres frecuencias de cobro
+-- de Equilibrio y Vitalidad (semanal = 7 días, quincenal = 15, mensual = 30).
+INSERT INTO "plan" ("id","name","plan_type","days_per_week","total_classes","price_mxn","cost_per_class","duration_days","is_active","is_public","is_add_on","is_unlimited","created_at") VALUES
+('plan-apertura','Clase Muestra','class_pack',0,1,0,0,30,true,true,false,false,now()),
+('plan-equilibrio-semanal','Plan Equilibrio Semanal','monthly',3,NULL,400,133.33,7,true,true,false,false,now()),
+('plan-equilibrio-quincenal','Plan Equilibrio Quincenal','monthly',3,NULL,700,116.67,15,true,true,false,false,now()),
+('plan-equilibrio-mensual','Plan Equilibrio Mensual','monthly',3,NULL,1350,112.5,30,true,true,false,false,now()),
+('plan-vitalidad-semanal','Plan Vitalidad Semanal','monthly',5,NULL,650,130,7,true,true,false,false,now()),
+('plan-vitalidad-quincenal','Plan Vitalidad Quincenal','monthly',5,NULL,1150,115,15,true,true,false,false,now()),
+('plan-vitalidad-mensual','Plan Vitalidad Mensual','monthly',5,NULL,2200,110,30,true,true,false,false,now())
 ON CONFLICT ("id") DO UPDATE SET
   "name" = EXCLUDED."name",
+  "plan_type" = EXCLUDED."plan_type",
+  "days_per_week" = EXCLUDED."days_per_week",
   "price_mxn" = EXCLUDED."price_mxn",
+  "duration_days" = EXCLUDED."duration_days",
+  "is_public" = EXCLUDED."is_public",
   "total_classes" = EXCLUDED."total_classes";
 
 -- ── 5. reformer ───────────────────────────────────────────────────────────────
@@ -90,28 +96,46 @@ ON CONFLICT ("id") DO NOTHING;
 
 -- ── 6. schedule_slot ──────────────────────────────────────────────────────────
 
-INSERT INTO "schedule_slot" ("id","class_name","instructor","alternate_instructor","schedule_mode","day_of_week","start_time","end_time","capacity","class_type","is_active","created_at") VALUES
-('slot-d1-t0700','Pilates Reformer','Elena Morales',NULL,'fixed',1,'07:00','08:00',8,'reformer',true,now()),
-('slot-d2-t0700','Pilates Reformer','Elena Morales',NULL,'fixed',2,'07:00','08:00',8,'reformer',true,now()),
-('slot-d3-t1000','Pilates Reformer','Elena Morales',NULL,'fixed',3,'10:00','11:00',8,'reformer',true,now()),
-('slot-d4-t1700','Pilates Reformer','Lucía Paredes',NULL,'fixed',4,'17:00','18:00',8,'reformer',true,now()),
-('slot-d5-t1900','Pilates Reformer','Lucía Paredes',NULL,'fixed',5,'19:00','20:00',8,'reformer',true,now()),
-('slot-d6-t0800','Pilates Reformer','Elena Morales','Lucía Paredes','dual',6,'08:00','09:00',8,'reformer',true,now()),
-('slot-d1-t1900','Pilates Reformer','Lucía Paredes',NULL,'fixed',1,'19:00','20:00',8,'reformer',true,now()),
-('slot-d2-t1300','Pilates Reformer','Lucía Paredes',NULL,'fixed',2,'13:00','14:00',8,'reformer',true,now())
+-- Parrilla oficial del estudio: turno matutino 07–11 y vespertino 17–21,
+-- de lunes a sábado (id = slot-d<día>-t<hora>).
+INSERT INTO "schedule_slot" ("id","class_name","instructor","alternate_instructor","schedule_mode","day_of_week","start_time","end_time","capacity","class_type","is_active","created_at")
+SELECT
+  'slot-d' || d.day_of_week || '-t' || replace(t.start_time, ':', ''),
+  'Pilates Reformer',
+  CASE WHEN t.start_time < '12:00' THEN 'Elena Morales' ELSE 'Lucía Paredes' END,
+  CASE WHEN d.day_of_week = 6 AND t.start_time = '08:00' THEN 'Lucía Paredes' END,
+  CASE WHEN d.day_of_week = 6 AND t.start_time = '08:00' THEN 'dual' ELSE 'fixed' END,
+  d.day_of_week,
+  t.start_time,
+  t.end_time,
+  8,
+  'reformer',
+  true,
+  now()
+FROM (VALUES (1),(2),(3),(4),(5),(6)) AS d(day_of_week)
+CROSS JOIN (VALUES
+  ('07:00','08:00'),
+  ('08:00','09:00'),
+  ('09:00','10:00'),
+  ('10:00','11:00'),
+  ('17:00','18:00'),
+  ('18:00','19:00'),
+  ('19:00','20:00'),
+  ('20:00','21:00')
+) AS t(start_time, end_time)
 ON CONFLICT ("id") DO UPDATE SET "instructor" = EXCLUDED."instructor", "is_active" = true;
 
 -- ── 7. subscription ───────────────────────────────────────────────────────────
 
 INSERT INTO "subscription" ("id","user_id","plan_id","status","start_date","end_date","classes_remaining","days_used_this_week","is_unlimited","discount_pct","discount_reason","billing_cycle","cost_per_class","paid_amount","created_at") VALUES
-('sub-za1001','user-alum-demo-1','plan-conecta','active',now() - interval '10 days',now() + interval '20 days',6,1,false,NULL,NULL,'mensual',200,1600,now()),
-('sub-za1002','user-alum-demo-2','plan-inicia','active',now() - interval '5 days',now() + interval '25 days',3,0,false,NULL,NULL,'mensual',237.5,950,now()),
-('sub-za1003','user-alum-demo-3','plan-activa','active',now() - interval '15 days',now() + interval '15 days',10,2,false,0.10,'evento_especial','mensual',150,1800,now()),
-('sub-za1004','user-alum-demo-4','plan-conecta','active',now() - interval '3 days',now() + interval '27 days',8,2,false,NULL,NULL,'mensual',200,1600,now()),
-('sub-za1005','user-alum-demo-5','plan-descubre','active',now() - interval '20 days',now() + interval '10 days',0,0,false,NULL,NULL,'efectivo',270,270,now()),
-('sub-za1006','user-alum-demo-6','plan-reinventa','active',now() - interval '8 days',now() + interval '22 days',18,1,false,NULL,NULL,'mensual',135,2700,now()),
-('sub-za1007','user-alum-demo-7','plan-conecta','cancelled',now() - interval '40 days',now() - interval '10 days',0,0,false,NULL,NULL,'mensual',200,1600,now()),
-('sub-expired-demo','user-alum-demo-8','plan-descubre','active',now() - interval '45 days',now() - interval '5 days',0,0,false,NULL,NULL,'mensual',270,270,now())
+('sub-za1001','user-alum-demo-1','plan-equilibrio-mensual','active',now() - interval '10 days',now() + interval '20 days',NULL,1,false,NULL,NULL,'mensual',112.5,1350,now()),
+('sub-za1002','user-alum-demo-2','plan-vitalidad-quincenal','active',now() - interval '5 days',now() + interval '10 days',NULL,0,false,NULL,NULL,'quincenal',115,1150,now()),
+('sub-za1003','user-alum-demo-3','plan-vitalidad-mensual','active',now() - interval '15 days',now() + interval '15 days',NULL,2,false,0.10,'evento_especial','mensual',99,1980,now()),
+('sub-za1004','user-alum-demo-4','plan-equilibrio-quincenal','active',now() - interval '3 days',now() + interval '12 days',NULL,2,false,NULL,NULL,'quincenal',116.67,700,now()),
+('sub-za1005','user-alum-demo-5','plan-apertura','active',now() - interval '20 days',now() + interval '10 days',0,0,false,NULL,NULL,'efectivo',0,0,now()),
+('sub-za1006','user-alum-demo-6','plan-vitalidad-semanal','active',now() - interval '3 days',now() + interval '4 days',NULL,1,false,NULL,NULL,'semanal',130,650,now()),
+('sub-za1007','user-alum-demo-7','plan-equilibrio-mensual','cancelled',now() - interval '40 days',now() - interval '10 days',0,0,false,NULL,NULL,'mensual',112.5,1350,now()),
+('sub-expired-demo','user-alum-demo-8','plan-equilibrio-semanal','active',now() - interval '45 days',now() - interval '5 days',NULL,0,false,NULL,NULL,'semanal',133.33,400,now())
 ON CONFLICT ("id") DO UPDATE SET
   "end_date" = EXCLUDED."end_date",
   "classes_remaining" = EXCLUDED."classes_remaining",
@@ -120,13 +144,13 @@ ON CONFLICT ("id") DO UPDATE SET
 -- ── 8. payment ────────────────────────────────────────────────────────────────
 
 INSERT INTO "payment" ("id","user_id","subscription_id","amount","currency","method","status","concept","collected_by","is_negative","created_at") VALUES
-('pay-za1001','user-alum-demo-1','sub-za1001',1600,'MXN','transferencia','succeeded','Inscripción: Conecta y Fortalece','Patricia',false,now() - interval '10 days'),
-('pay-za1002','user-alum-demo-2','sub-za1002',950,'MXN','efectivo','succeeded','Inscripción: Inicia tu camino','Lucía',false,now() - interval '5 days'),
-('pay-za1003','user-alum-demo-3','sub-za1003',1800,'MXN','transferencia','succeeded','Inscripción: Activa (10% desc.)','Ricardo',false,now() - interval '15 days'),
-('pay-za1004','user-alum-demo-4','sub-za1004',1600,'MXN','transferencia','succeeded','Inscripción: Conecta y Fortalece','Patricia',false,now() - interval '3 days'),
-('pay-za1005','user-alum-demo-5','sub-za1005',270,'MXN','efectivo','succeeded','Clase Descubre','Elena',false,now() - interval '20 days'),
-('pay-za1006','user-alum-demo-6','sub-za1006',2700,'MXN','transferencia','succeeded','Reinventa tu ser','Ricardo',false,now() - interval '8 days'),
-('pay-expired-demo','user-alum-demo-8','sub-expired-demo',270,'MXN','efectivo','succeeded','Clase Descubre (vencido demo)','Lucía',false,now() - interval '45 days'),
+('pay-za1001','user-alum-demo-1','sub-za1001',1350,'MXN','transferencia','succeeded','Inscripción: Plan Equilibrio Mensual','Patricia',false,now() - interval '10 days'),
+('pay-za1002','user-alum-demo-2','sub-za1002',1150,'MXN','efectivo','succeeded','Inscripción: Plan Vitalidad Quincenal','Lucía',false,now() - interval '5 days'),
+('pay-za1003','user-alum-demo-3','sub-za1003',1980,'MXN','transferencia','succeeded','Inscripción: Plan Vitalidad Mensual (10% desc.)','Ricardo',false,now() - interval '15 days'),
+('pay-za1004','user-alum-demo-4','sub-za1004',700,'MXN','transferencia','succeeded','Inscripción: Plan Equilibrio Quincenal','Patricia',false,now() - interval '3 days'),
+('pay-za1005','user-alum-demo-5','sub-za1005',0,'MXN','efectivo','succeeded','Clase Muestra','Elena',false,now() - interval '20 days'),
+('pay-za1006','user-alum-demo-6','sub-za1006',650,'MXN','transferencia','succeeded','Plan Vitalidad Semanal','Ricardo',false,now() - interval '3 days'),
+('pay-expired-demo','user-alum-demo-8','sub-expired-demo',400,'MXN','efectivo','succeeded','Plan Equilibrio Semanal (vencido demo)','Lucía',false,now() - interval '45 days'),
 ('pay-egreso-limpieza','user-admin-demo-1',NULL,-500,'MXN','efectivo','succeeded','Limpieza profunda estudio','Patricia',true,now()),
 ('pay-egreso-dhl','user-admin-demo-1',NULL,-370,'MXN','transferencia','succeeded','Envío DHL insumos','Ricardo',true,now())
 ON CONFLICT ("id") DO UPDATE SET "amount" = EXCLUDED."amount";
@@ -153,7 +177,7 @@ ON CONFLICT ("id") DO NOTHING;
 -- ── 11. refund ────────────────────────────────────────────────────────────────
 
 INSERT INTO "refund" ("id","user_id","subscription_id","classes_total","classes_used","classes_refunded","cost_per_class","total_paid","refund_amount","reason","refund_date","processed_by","created_at") VALUES
-('refund-fake-001','user-alum-demo-7','sub-za1007',8,6,2,200,1600,400,'Baja anticipada — 2 clases sin usar',now(),'user-admin-demo-1',now())
+('refund-fake-001','user-alum-demo-7','sub-za1007',12,9,3,112.5,1350,337.5,'Baja anticipada — 3 clases sin usar',now(),'user-admin-demo-1',now())
 ON CONFLICT ("id") DO NOTHING;
 
 -- ── 12. coach_payroll_period ──────────────────────────────────────────────────

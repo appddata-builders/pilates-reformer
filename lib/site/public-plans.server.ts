@@ -4,7 +4,7 @@ import { and, asc, eq } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import {
-  planRowToPublicPlan,
+  buildPublicPlanCards,
   sortPublicPlans,
   type PublicPlan,
 } from "@/lib/site/plans"
@@ -17,6 +17,7 @@ export async function loadReservacionesPlans(): Promise<PublicPlan[]> {
         id: schema.plan.id,
         name: schema.plan.name,
         planType: schema.plan.planType,
+        daysPerWeek: schema.plan.daysPerWeek,
         totalClasses: schema.plan.totalClasses,
         durationDays: schema.plan.durationDays,
         priceMxn: schema.plan.priceMxn,
@@ -32,8 +33,7 @@ export async function loadReservacionesPlans(): Promise<PublicPlan[]> {
       )
       .orderBy(asc(schema.plan.createdAt))
 
-    const sorted = sortPublicPlans(rows)
-    return sorted.map(planRowToPublicPlan)
+    return buildPublicPlanCards(sortPublicPlans(rows))
   } catch (error) {
     // La landing se prerenderiza en build: si la BD está caída o le falta una
     // migración de scripts/postgres-manual, preferimos publicar sin planes antes

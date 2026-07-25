@@ -107,15 +107,24 @@ Todas las contraseñas son **solo para demostración**. No las usen en la vida r
 
 ## Planes cargados en la demo
 
-| Plan | Tipo | Clases | Precio (MXN) |
-|------|------|--------|--------------|
-| Clase de Apertura | Paquete | 1 | $0 |
-| Clase Descubre | Paquete | 1 | $270 |
-| Inicia tu camino | Paquete | 4 | $950 |
-| Conecta y Fortalece | Paquete | 8 | $1,600 |
-| Activa tu grandeza interior | Paquete | 12 | $2,000 |
-| Reinventa tu ser | Paquete | 20 | $2,700 |
-| Clase Privada | Add-on | 1 | $500 |
+| Plan | Tipo | Clases | Vigencia | Precio (MXN) |
+|------|------|--------|----------|--------------|
+| Clase Muestra | Paquete | 1 | 30 días | $0 |
+| Plan Equilibrio Semanal | Mensual | 3 por semana | 7 días | $400 |
+| Plan Equilibrio Quincenal | Mensual | 3 por semana | 15 días | $700 |
+| Plan Equilibrio Mensual | Mensual | 3 por semana | 30 días | $1,350 |
+| Plan Vitalidad Semanal | Mensual | 5 por semana | 7 días | $650 |
+| Plan Vitalidad Quincenal | Mensual | 5 por semana | 15 días | $1,150 |
+| Plan Vitalidad Mensual | Mensual | 5 por semana | 30 días | $2,200 |
+
+**Equilibrio** se practica Lunes, Miércoles y Viernes · Martes, Jueves y Sábado;
+**Vitalidad**, de lunes a viernes.
+
+Cada frecuencia de cobro es un plan propio en la BD. En la landing, Equilibrio y
+Vitalidad se muestran como **una sola tarjeta con foto** donde se elige la
+frecuencia (Semanal · Quincenal · Mensual) — al cambiarla se recalculan las clases
+incluidas y **Adquirir Plan** lleva a esa frecuencia. La **Clase Muestra** va
+aparte, en una barra sin foto justo debajo de las tarjetas.
 
 ---
 
@@ -123,14 +132,14 @@ Todas las contraseñas son **solo para demostración**. No las usen en la vida r
 
 | Alumna | ID | Plan activo | Notas demo |
 |--------|-----|-------------|------------|
-| Irene Salazar | ST1001 | Conecta y Fortalece | 6 clases restantes |
-| Beatriz Montiel | ST1002 | Inicia tu camino | 3 clases restantes |
-| Luciana Fajardo | ST1003 | Activa tu grandeza interior | 10% descuento demo |
-| Greta Ibáñez | ST1004 | Conecta y Fortalece | 8 clases restantes |
-| Helena Duarte | ST1005 | Clase Descubre | 0 clases (paquete agotado) |
-| Rebeca Toscano | ST1006 | Reinventa tu ser | 18 clases restantes |
-| Alma Delgado | ST1007 | Conecta (cancelada) | Membresía cancelada + devolución demo |
-| Jimena Solís | ST1008 | Clase Descubre | Plan vencido (alertas de vencimiento) |
+| Irene Salazar | ST1001 | Plan Equilibrio Mensual | 1 día usado esta semana |
+| Beatriz Montiel | ST1002 | Plan Vitalidad Quincenal | Cobro quincenal en efectivo |
+| Luciana Fajardo | ST1003 | Plan Vitalidad Mensual | 10% descuento demo |
+| Greta Ibáñez | ST1004 | Plan Equilibrio Quincenal | 2 días usados esta semana |
+| Helena Duarte | ST1005 | Clase Muestra | 0 clases (muestra ya tomada) |
+| Rebeca Toscano | ST1006 | Plan Vitalidad Semanal | Renovación semanal |
+| Alma Delgado | ST1007 | Plan Equilibrio Mensual (cancelada) | Membresía cancelada + devolución demo |
+| Jimena Solís | ST1008 | Plan Equilibrio Semanal | Plan vencido (alertas de vencimiento) |
 
 ---
 
@@ -138,16 +147,17 @@ Todas las contraseñas son **solo para demostración**. No las usen en la vida r
 
 Coaches en turnos: **Elena Morales** y **Lucía Paredes**. Clase: **Pilates Reformer**, capacidad **8**.
 
-| Día | Hora | Instructora |
-|-----|------|-------------|
-| Lunes | 07:00–08:00 | Elena Morales |
-| Lunes | 19:00–20:00 | Lucía Paredes |
-| Martes | 07:00–08:00 | Elena Morales |
-| Martes | 13:00–14:00 | Lucía Paredes |
-| Miércoles | 10:00–11:00 | Elena Morales |
-| Jueves | 17:00–18:00 | Lucía Paredes |
-| Viernes | 19:00–20:00 | Lucía Paredes |
-| Sábado | 08:00–09:00 | Elena + Lucía (dual) |
+Parrilla completa de **lunes a sábado** (48 horarios), en los dos turnos del estudio:
+
+| Turno Matutino | Turno Vespertino |
+|----------------|------------------|
+| 07:00–08:00 | 17:00–18:00 |
+| 08:00–09:00 | 18:00–19:00 |
+| 09:00–10:00 | 19:00–20:00 |
+| 10:00–11:00 | 20:00–21:00 |
+
+Matutino a cargo de **Elena Morales** y vespertino de **Lucía Paredes**; el sábado
+08:00–09:00 queda en modo **dual** (Elena + Lucía).
 
 **Reformers:** 8 máquinas activas (Reformer 1–8; la 3 tiene nota de mantenimiento reciente).
 
@@ -158,7 +168,7 @@ Coaches en turnos: **Elena Morales** y **Lucía Paredes**. Clase: **Pilates Refo
 - **7 reservas** de ejemplo (asistidas, no asistidas, canceladas y una futura).
 - **Pagos:** inscripciones por transferencia/efectivo; dos egresos (limpieza −$500, DHL −$370).
 - **Ventas:** calcetas antiderrapantes, clase privada 1:1.
-- **Devolución:** Alma Delgado — 2 clases reembolsadas ($400).
+- **Devolución:** Alma Delgado — 3 clases reembolsadas ($337.50).
 - **Nómina coaches:** Elena pagada; Lucía pendiente (mayo 2026).
 - **KPIs:** snapshots Enero–Marzo 2026.
 - **Eventos:** taller movilidad de cadera; cumpleaños Irene Salazar.
@@ -201,7 +211,7 @@ Mismo menú que administración, con permisos de operador del sistema.
 
 ### Con **alumna** (por ejemplo `irene.salazar@demo.pilates.mx`)
 
-Experiencia de clienta: perfil, reservas y plan **Conecta y Fortalece** asignado en la demo.
+Experiencia de clienta: perfil, reservas y plan **Equilibrio Mensual** asignado en la demo.
 
 ---
 
@@ -210,7 +220,7 @@ Experiencia de clienta: perfil, reservas y plan **Conecta y Fortalece** asignado
 Fuera del login, el landing de producto incluye:
 
 - Hero con **Continuar configuración** y **horario semanal** (grilla Lun–Sáb, burbuja inscritos/aforo).
-- Planes **Studio 57** (Equilibrio / Vitalidad) — solo presentación, no conectados al seed.
+- Planes **Studio 57** (Equilibrio y Vitalidad con selector de frecuencia, más la Clase Muestra) — se leen de la tabla `plan`, con botón **Adquirir Plan**.
 - Sección **Horarios** (bloques matutino / vespertino).
 - Sección **Agenda** (reserva rápida por bloques).
 - Cobros, membresías y contacto de demostración.
@@ -220,7 +230,7 @@ Fuera del login, el landing de producto incluye:
 ## Sobre los nombres y los datos
 
 - **Ricardo, Patricia, Elena, Lucía, Irene, Beatriz…** son personas **inventadas** para la demo.
-- **Planes y precios** del seed son datos de demo; el landing muestra la vitrina **Studio 57** como ejemplo de producto Appstract.
+- **Planes y precios** son los de **Studio 57**: el landing los lee de la misma tabla `plan` que administra el estudio, así que cualquier cambio desde **Dashboard → Planes** se refleja en la vitrina pública.
 - Los códigos **ST1001–ST1008** muestran cómo se verán los folios cuando el estudio use datos reales.
 
 ---

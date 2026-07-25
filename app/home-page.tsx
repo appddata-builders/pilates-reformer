@@ -75,6 +75,10 @@ export function HomePage(props: { plans: PublicPlan[] }) {
   const heroVideoRef = useRef<HTMLVideoElement>(null);
   const [heroVideoPlaying, setHeroVideoPlaying] = useState(true);
 
+  const planCards = props.plans.filter((plan) => plan.layout === "card");
+  const planBars = props.plans.filter((plan) => plan.layout === "bar");
+  const [selectedCadence, setSelectedCadence] = useState<Record<string, string>>({});
+
   const toggleHeroVideo = () => {
     const video = heroVideoRef.current;
     if (!video) return;
@@ -366,59 +370,105 @@ export function HomePage(props: { plans: PublicPlan[] }) {
               </p>
             </motion.div>
 
-            <div className="grid gap-8">
-              {props.plans.length === 0 ? (
-                <motion.p variants={fadeUp} className="text-base text-black/70">
-                  Pronto publicaremos los planes disponibles.
-                </motion.p>
-              ) : (
-                props.plans.map((plan, index) => {
-                  const image = PLAN_IMAGES[index % PLAN_IMAGES.length];
-                  return (
-                    <motion.article
-                      key={plan.id}
-                      variants={fadeUp}
-                      className="grid grid-cols-1 gap-3 overflow-hidden lg:rounded-card border border-black/10 bg-white/90 shadow-[0_20px_40px_rgba(27,26,24,0.08)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:min-h-[28rem]"
-                    >
-                      <div className="relative aspect-5/4 w-full overflow-hidden lg:aspect-auto lg:h-full lg:self-stretch">
-                        <div
-                          className="absolute inset-0 bg-[#d8cfc2] bg-cover bg-center"
-                          style={{ backgroundImage: `url('${image}')` }}
-                        />
-                      </div>
-                      <div className="flex flex-col justify-between gap-6 p-4 sm:p-6">
-                        <div className="flex flex-col gap-5">
-                          <div>
-                            {plan.badge ? (
-                              <p className="eyebrow text-green-base">{plan.badge}</p>
-                            ) : null}
-                            <h3 className="text-xl font-semibold font-display sm:text-2xl">
-                              {plan.name}
-                            </h3>
-                            <p className="mt-2 text-sm font-semibold text-green-base">
-                              {plan.includes}
-                              {plan.validity !== "—" ? ` · ${plan.validity}` : ""}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 rounded-inner border border-black/5 bg-[#f6f1ea]/80 px-4 py-3">
-                            <span className="eyebrow text-black/50">Precio</span>
-                            <span className="text-2xl font-semibold text-green-base">
-                              {plan.priceLabel}
-                            </span>
-                          </div>
+            {props.plans.length === 0 ? (
+              <motion.p variants={fadeUp} className="text-base text-black/70">
+                Pronto publicaremos los planes disponibles.
+              </motion.p>
+            ) : (
+              <>
+                <div className="grid gap-8">
+                  {planCards.map((plan, index) => {
+                    const image = PLAN_IMAGES[index % PLAN_IMAGES.length];
+                    const activePrice =
+                      plan.prices.find(
+                        (price) => price.label === selectedCadence[plan.id],
+                      ) ?? plan.prices[0];
+
+                    return (
+                      <motion.article
+                        key={plan.id}
+                        variants={fadeUp}
+                        className="grid grid-cols-1 gap-3 overflow-hidden lg:rounded-card border border-black/10 bg-white/90 shadow-[0_20px_40px_rgba(27,26,24,0.08)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:min-h-[28rem]"
+                      >
+                        <div className="relative aspect-5/4 w-full overflow-hidden lg:aspect-auto lg:h-full lg:self-stretch">
+                          <div
+                            className="absolute inset-0 bg-[#d8cfc2] bg-cover bg-center"
+                            style={{ backgroundImage: `url('${image}')` }}
+                          />
                         </div>
-                        <Link
-                          href={routes.registry}
-                          className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover"
-                        >
-                          Adquirir Plan
-                        </Link>
-                      </div>
-                    </motion.article>
-                  );
-                })
-              )}
-            </div>
+                        <div className="flex flex-col justify-between gap-6 p-4 sm:p-6">
+                          <div className="flex flex-col gap-5">
+                            <div>
+                              {plan.badge ? (
+                                <p className="eyebrow text-green-base">{plan.badge}</p>
+                              ) : null}
+                              <h3 className="text-xl font-semibold font-display sm:text-2xl">
+                                {plan.name}
+                              </h3>
+                              <p className="mt-2 text-sm font-semibold text-green-base">
+                                {activePrice.includes}
+                              </p>
+                              {plan.note ? (
+                                <p className="mt-1 text-sm text-black/60">{plan.note}</p>
+                              ) : null}
+                            </div>
+                            <div className="grid gap-2 text-sm">
+                              {plan.prices.map((price) => {
+                                const isActive = price.label === activePrice.label;
+                                return (
+                                  <button
+                                    key={price.label}
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedCadence((prev) => ({
+                                        ...prev,
+                                        [plan.id]: price.label,
+                                      }))
+                                    }
+                                    aria-pressed={isActive}
+                                    className={`flex items-center justify-between gap-2 rounded-inner border px-3 py-2.5 text-left transition sm:px-4 sm:py-3 ${
+                                      isActive
+                                        ? "border-green-base bg-green-base/10 ring-1 ring-green-base/30"
+                                        : "border-black/5 bg-[#f6f1ea]/80 hover:border-green-base/40"
+                                    }`}
+                                  >
+                                    <span className="eyebrow text-black/50">
+                                      {price.label}
+                                    </span>
+                                    <span className="text-lg font-semibold text-green-base">
+                                      {price.priceLabel}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <Link
+                            href={`${routes.login}?plan=${activePrice.planId}`}
+                            className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover"
+                          >
+                            Adquirir Plan
+                          </Link>
+                        </div>
+                      </motion.article>
+                    );
+                  })}
+                </div>
+
+                {planBars.map((plan) => (
+                  <motion.div
+                    key={plan.id}
+                    variants={fadeUp}
+                    className="flex items-center justify-between lg:rounded-card border border-black/10 bg-white/80 px-6 py-5"
+                  >
+                    <p className="eyebrow eyebrow-muted">{plan.badge ?? plan.name}</p>
+                    <p className="text-2xl font-semibold text-green-base">
+                      {plan.prices[0].priceLabel}
+                    </p>
+                  </motion.div>
+                ))}
+              </>
+            )}
           </motion.div>
         </section>
 

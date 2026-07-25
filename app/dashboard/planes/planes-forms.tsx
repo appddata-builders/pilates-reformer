@@ -243,6 +243,7 @@ export function PlanesFormsClient(props: { planes: PlanRow[]; embedded?: boolean
                       plan.planType,
                       plan.totalClasses,
                       false,
+                      plan.daysPerWeek,
                     )}
                   </TableCell>
                   <TableCell>
