@@ -5,7 +5,6 @@ import { auth } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, count, eq, gte, lte } from "drizzle-orm"
-import { coachScheduleSlotSql, getCoachSessionInfo } from "@/lib/coach-schedule-visibility"
 import { isAlumnoRole, getSessionUserId } from "@/lib/alumno-scope"
 import { evaluateStudentSelfRelease } from "@/lib/booking-rules"
 import { pickPrimarySubscription } from "@/lib/subscription-display"
@@ -17,6 +16,7 @@ import { Button } from "@/components/shared/ui/button"
 import { dateRangeForDay, localTodayStr } from "@/lib/booking-slot-options"
 import Link from "next/link"
 import { ReservaCard } from "./reserva-card"
+import { PendingPaymentsPanel, type PendingPaymentRow } from "./pending-payments-panel"
 
 function isAdminOrRoot(role: string) {
   return role === "admin" || role === "root"
@@ -45,7 +45,6 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
   })
   const role = session?.user?.role ?? ""
   const userId = getSessionUserId(session?.user)
-  const coachSession = getCoachSessionInfo(session?.user)
   const isAlumno = isAlumnoRole(role)
   const isAdminRoot = isAdminOrRoot(role)
   const isCoach = role === "coach"
@@ -92,6 +91,36 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
     }
   }
 
+  let pendingPayments: PendingPaymentRow[] = []
+  if (isAlumno && userId != null) {
+    const rows = await db
+      .select({
+        id: schema.payment.id,
+        amount: schema.payment.amount,
+        concept: schema.payment.concept,
+        createdAt: schema.payment.createdAt,
+      })
+      .from(schema.payment)
+      .where(
+        and(
+          eq(schema.payment.userId, userId),
+          eq(schema.payment.status, "pending"),
+          eq(schema.payment.isNegative, false),
+        ),
+      )
+      .orderBy(asc(schema.payment.createdAt))
+
+    pendingPayments = rows.map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      concept: row.concept,
+      createdAt:
+        row.createdAt instanceof Date
+          ? row.createdAt
+          : new Date(row.createdAt as unknown as number),
+    }))
+  }
+
   let alumnas: { id: string; name: string; displayId: string | null }[] = []
   if (isAdminRoot) {
     alumnas = await db
@@ -114,10 +143,6 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
     bookingConditions.push(eq(schema.booking.userId, userId))
   } else if (isAdminRoot && alumnaFilter.length > 0) {
     bookingConditions.push(eq(schema.booking.userId, alumnaFilter))
-  }
-
-  if (coachSession != null) {
-    bookingConditions.push(coachScheduleSlotSql(schema.scheduleSlot, coachSession))
   }
 
   const dateFilter = and(...bookingConditions)
@@ -174,7 +199,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
   const description = isAlumno
     ? `${totalItems} ${totalItems === 1 ? "reserva tuya" : "reservas tuyas"} en este día`
     : isCoach
-      ? `${totalItems} reservas en tus clases asignadas`
+      ? `${totalItems} reservas en este día`
       : alumnaFilter.length > 0
         ? (() => {
             const a = alumnas.find((x) => x.id === alumnaFilter)
@@ -196,6 +221,8 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
           </Button>
         ) : null}
       </PageHeader>
+
+      <PendingPaymentsPanel rows={pendingPayments} />
 
       <form
         data-tour="reservas-filter"

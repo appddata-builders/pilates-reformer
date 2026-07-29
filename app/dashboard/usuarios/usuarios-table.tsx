@@ -17,6 +17,7 @@ import {
 import { routes } from "@/lib/routes"
 import { buildSortHref } from "@/lib/list-sort"
 import type { ListSortDir } from "@/lib/list-sort"
+import { ALUMNO_ROLE_LABEL } from "@/lib/user-role"
 import { AlumnoRowActions } from "./alumno-row-actions"
 import type { PlanOption } from "./plan-picker-fields"
 
@@ -77,10 +78,12 @@ export function UsuariosTable(props: {
   sort: string
   dir: ListSortDir
   sortQuery: Record<string, string | undefined>
+  canManage: boolean
 }) {
   const [searchQuery, setSearchQuery] = useState("")
   const q = searchQuery.trim().toLowerCase()
   const visibleRows = q === "" ? props.rows : props.rows.filter((row) => rowMatchesSearch(row, q))
+  const columnCount = props.canManage ? 10 : 9
 
   return (
     <div data-tour="page-table" className="rounded-lg border bg-card">
@@ -129,24 +132,29 @@ export function UsuariosTable(props: {
             >
               Correo
             </SortableTableHead>
+            <TableHead className="text-muted-foreground font-normal text-sm">Rol</TableHead>
             <TableHead className="text-muted-foreground font-normal text-sm">Plan activo</TableHead>
             <TableHead className="text-muted-foreground font-normal text-sm">Rest.</TableHead>
             <TableHead className="text-muted-foreground font-normal text-sm">Alertas</TableHead>
-            <TableHead className="text-muted-foreground font-normal text-sm">Suscripción</TableHead>
+            <TableHead className="text-muted-foreground font-normal text-sm">Estado</TableHead>
             <TableHead className="text-muted-foreground font-normal text-sm">Renovación</TableHead>
-            <TableHead className="text-muted-foreground font-normal text-sm text-right">Acciones</TableHead>
+            {props.canManage ? (
+              <TableHead className="text-muted-foreground font-normal text-sm text-right">
+                Acciones
+              </TableHead>
+            ) : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {props.rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={columnCount} className="text-center text-muted-foreground py-8">
                 Sin usuarios registrados
               </TableCell>
             </TableRow>
           ) : visibleRows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={columnCount} className="text-center text-muted-foreground py-8">
                 Ningún usuario coincide con la búsqueda
               </TableCell>
             </TableRow>
@@ -170,6 +178,9 @@ export function UsuariosTable(props: {
                   </Link>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{row.email}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">{ALUMNO_ROLE_LABEL}</Badge>
+                </TableCell>
                 <TableCell>{row.planName ?? "—"}</TableCell>
                 <TableCell>
                   {!row.hasSubscription ? (
@@ -195,23 +206,25 @@ export function UsuariosTable(props: {
                 </TableCell>
                 <TableCell>{subscriptionColumnBadge(row.hasSubscription, row.enabled)}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">{row.renewalLabel}</TableCell>
-                <TableCell className="text-right">
-                  <AlumnoRowActions
-                    planes={props.planes}
-                    alumno={{
-                      id: row.id,
-                      name: row.name,
-                      email: row.email,
-                      phone: row.phone,
-                      notes: row.notes,
-                      birthdate: row.birthdate,
-                      displayId: row.displayId,
-                      planId: row.planId,
-                      billingCycle: row.billingCycle,
-                      enabled: row.enabled,
-                    }}
-                  />
-                </TableCell>
+                {props.canManage ? (
+                  <TableCell className="text-right">
+                    <AlumnoRowActions
+                      planes={props.planes}
+                      alumno={{
+                        id: row.id,
+                        name: row.name,
+                        email: row.email,
+                        phone: row.phone,
+                        notes: row.notes,
+                        birthdate: row.birthdate,
+                        displayId: row.displayId,
+                        planId: row.planId,
+                        billingCycle: row.billingCycle,
+                        enabled: row.enabled,
+                      }}
+                    />
+                  </TableCell>
+                ) : null}
               </TableRow>
             ))
           )}

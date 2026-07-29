@@ -296,7 +296,6 @@ export async function deletePlanAction(
   revalidatePath("/dashboard/planes")
   revalidatePath("/dashboard/configuracion")
   revalidatePath("/dashboard/usuarios")
-  revalidatePath("/dashboard/suscripciones")
   revalidatePath("/")
   revalidatePath("/agendar")
   return { success: true }

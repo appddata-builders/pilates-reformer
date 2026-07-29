@@ -44,7 +44,7 @@ export function Navbar({
       setSigningOut(false)
       return
     }
-    window.location.assign(`${routes.login}?signedOut=1`)
+    window.location.assign(routes.login)
   }
 
   return (

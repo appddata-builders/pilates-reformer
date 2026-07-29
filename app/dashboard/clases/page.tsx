@@ -5,8 +5,9 @@ import { auth } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq, and, gte, lte, asc } from "drizzle-orm"
-import { filterSlotsForCoach, getCoachSessionInfo } from "@/lib/coach-schedule-visibility"
+import { hidesInstructorAssignment } from "@/lib/instructor-visibility"
 import { nextOccurrenceForDayOfWeek, toLocalDateStr } from "@/lib/booking-slot-options"
+import { isSlotPastToday } from "@/lib/class-timing"
 import { listDisabledSlotDateKeys } from "@/lib/slot-exceptions"
 import { getMondayOfWeek } from "@/lib/site/schedule"
 import { ClasesClient } from "./clases-client"
@@ -17,7 +18,7 @@ export default async function ClasesPage() {
     query: { disableRefresh: true },
   })
   const role = session?.user?.role ?? ""
-  const coachSession = getCoachSessionInfo(session?.user)
+  const hideInstructor = hidesInstructorAssignment(role)
   const canManage = role === "admin" || role === "root"
 
   const db = getDb()
@@ -27,10 +28,11 @@ export default async function ClasesPage() {
     .from(schema.scheduleSlot)
     .orderBy(schema.scheduleSlot.dayOfWeek, schema.scheduleSlot.startTime)
 
-  const visibleSlots = filterSlotsForCoach(allSlots, coachSession)
-  const slots = visibleSlots
+  // Sin filtro por instructor: el coach ve todo el horario para poder cubrir.
+  const slots = allSlots
 
-  const rangeStart = new Date()
+  const now = new Date()
+  const rangeStart = new Date(now)
   rangeStart.setHours(0, 0, 0, 0)
   const rangeEnd = new Date(rangeStart)
   rangeEnd.setDate(rangeEnd.getDate() + 7)
@@ -94,8 +96,9 @@ export default async function ClasesPage() {
   const slotCards: SlotCardData[] = slots.map((slot) => ({
     id: slot.id,
     className: slot.className,
-    instructor: slot.instructor,
-    alternateInstructor: slot.alternateInstructor ?? null,
+    // Al coach ni se le manda la asignación: no viaja al navegador.
+    instructor: hideInstructor ? null : slot.instructor,
+    alternateInstructor: hideInstructor ? null : (slot.alternateInstructor ?? null),
     scheduleMode: slot.scheduleMode ?? "fixed",
     dayOfWeek: slot.dayOfWeek,
     startTime: slot.startTime,
@@ -105,14 +108,18 @@ export default async function ClasesPage() {
     isActive: slot.isActive,
     bookedToday: countMap.get(slot.id) ?? 0,
     disabledDates: disabledBySlot.get(slot.id) ?? [],
+    nextDateStr: toLocalDateStr(nextOccurrenceForDayOfWeek(slot.dayOfWeek)),
+    isPast: isSlotPastToday(slot, now),
   }))
 
   return (
     <ClasesClient
       slots={slotCards}
       activeCount={activeCount}
-      coaches={coaches}
+      coaches={canManage ? coaches : []}
       canManage={canManage}
+      todayDow={now.getDay()}
+      todayKey={toLocalDateStr(now)}
     />
   )
 }

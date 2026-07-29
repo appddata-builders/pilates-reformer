@@ -24,6 +24,8 @@ export const user = pgTable("user", {
   notes: text("notes"),
   enabled: boolean("enabled").notNull().default(true),
   welcomeShown: boolean("welcome_shown").notNull().default(false),
+  // Clase muestra: se redime una sola vez por cuenta y no genera cobro.
+  trialClassUsedAt: timestamp("trial_class_used_at", { precision: 3, mode: "date" }),
   createdAt: timestamp("created_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
 })
@@ -208,22 +210,6 @@ export const saleItem = pgTable("sale_item", {
   createdAt: timestamp("created_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
 })
 
-export const refund = pgTable("refund", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  subscriptionId: text("subscription_id").references(() => subscription.id),
-  classesTotal: integer("classes_total").notNull(),
-  classesUsed: integer("classes_used").notNull(),
-  classesRefunded: integer("classes_refunded").notNull(),
-  costPerClass: doublePrecision("cost_per_class").notNull(),
-  totalPaid: doublePrecision("total_paid").notNull(),
-  refundAmount: doublePrecision("refund_amount").notNull(),
-  reason: text("reason"),
-  refundDate: timestamp("refund_date", { precision: 3, mode: "date" }).notNull().defaultNow(),
-  processedBy: text("processed_by").references(() => user.id),
-  createdAt: timestamp("created_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
-})
-
 export const coachPayrollPeriod = pgTable("coach_payroll_period", {
   id: text("id").primaryKey(),
   coachId: text("coach_id").notNull().references(() => user.id),
@@ -329,7 +315,6 @@ export const userRelations = relations(user, ({ many }) => ({
   payments: many(payment),
   notifications: many(notification),
   studioEvents: many(studioEvent, { relationName: "relatedEvents" }),
-  refunds: many(refund),
   sales: many(saleItem),
   payrollPeriods: many(coachPayrollPeriod),
 }))
@@ -366,7 +351,6 @@ export const subscriptionRelations = relations(subscription, ({ one, many }) => 
   user: one(user, { fields: [subscription.userId], references: [user.id] }),
   plan: one(plan, { fields: [subscription.planId], references: [plan.id] }),
   payments: many(payment),
-  refunds: many(refund),
 }))
 
 export const bookingRelations = relations(booking, ({ one }) => ({
@@ -381,12 +365,6 @@ export const paymentRelations = relations(payment, ({ one }) => ({
 
 export const saleItemRelations = relations(saleItem, ({ one }) => ({
   user: one(user, { fields: [saleItem.userId], references: [user.id] }),
-}))
-
-export const refundRelations = relations(refund, ({ one }) => ({
-  user: one(user, { fields: [refund.userId], references: [user.id] }),
-  subscription: one(subscription, { fields: [refund.subscriptionId], references: [subscription.id] }),
-  processor: one(user, { fields: [refund.processedBy], references: [user.id], relationName: "refundProcessor" }),
 }))
 
 export const coachPayrollRelations = relations(coachPayrollPeriod, ({ one }) => ({

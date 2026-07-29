@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect, useState } from "react"
+import { startTransition, useActionState, useEffect, useState } from "react"
 import Link from "next/link"
 import { CircleCheck, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/shared/ui/button"
@@ -29,11 +29,18 @@ import {
   checkPublicBookingEligibility,
   createPublicBookingAction,
   loadAgendarDataAction,
-  sendBookingPaymentNotificationAction,
   type AgendarData,
   type PublicBookingState,
 } from "@/app/agendar/actions"
 import { routes } from "@/lib/routes"
+
+function formatMxn(amount: number): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 async function waitForSessionUser() {
   for (let i = 0; i < 40; i++) {
@@ -53,9 +60,11 @@ function AgendarBookingForm(props: {
   defaultDate: string
   todayStr: string
   disabledSlotDateKeys: string[]
+  bookedBySlotDate: Record<string, number>
   initialDate?: string
   initialSlotId?: string
   onClose: () => void
+  onBooked?: () => void
 }) {
   const [state, formAction, pending] = useActionState<PublicBookingState, FormData>(
     createPublicBookingAction,
@@ -83,17 +92,26 @@ function AgendarBookingForm(props: {
     slotId: string
     userName: string
   } | null>(null)
-  const [noClasses, setNoClasses] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "transferencia" | null>(null)
-  const [paymentNotifyPending, setPaymentNotifyPending] = useState(false)
-  const [transferModalOpen, setTransferModalOpen] = useState(false)
+  const [willBeCharged, setWillBeCharged] = useState<{
+    priceMxn: number
+    planName: string
+  } | null>(null)
+  const [trialAvailable, setTrialAvailable] = useState(false)
+  const [useTrialClass, setUseTrialClass] = useState(false)
+  // Reservas hechas en esta sesión: el cupo baja sin recargar la página.
+  const [extraBooked, setExtraBooked] = useState<Record<string, number>>({})
+  const { onBooked } = props
 
   const dayOfWeek = getDayOfWeekFromDateStr(bookingDate)
   const slotsForDay = filterSlotsForBookingDate(
     props.slots,
     bookingDate,
     props.disabledSlotDateKeys,
-  )
+  ).map((slot) => {
+    const key = `${slot.id}|${bookingDate}`
+    const booked = (props.bookedBySlotDate[key] ?? 0) + (extraBooked[key] ?? 0)
+    return { ...slot, booked, free: Math.max(0, slot.capacity - booked) }
+  })
   const nextDate = nextDateWithSlots(bookingDate, props.slots, props.disabledSlotDateKeys)
   const canUseNextDate =
     bookingDate !== "" &&
@@ -117,7 +135,7 @@ function AgendarBookingForm(props: {
 
   useEffect(() => {
     if (!scheduleSlotId) return
-    const valid = slotsForDay.some((s) => s.id === scheduleSlotId)
+    const valid = slotsForDay.some((s) => s.id === scheduleSlotId && s.free > 0)
     if (!valid) {
       setScheduleSlotId("")
     }
@@ -126,34 +144,32 @@ function AgendarBookingForm(props: {
   useEffect(() => {
     if (state.success && state.message) {
       const confirmedName = state.message.replace(/, tu clase quedó confirmada\.$/, "")
+      const confirmedDate = state.bookedDate ?? bookingDate
       setCheckMessage(state.message)
       setCheckOk(true)
       setLoginOpen(false)
       setConfirmedBooking({
-        date: state.bookedDate ?? bookingDate,
+        date: confirmedDate,
         slotId: scheduleSlotId,
         userName: confirmedName,
       })
+      const key = `${scheduleSlotId}|${confirmedDate}`
+      setExtraBooked((prev) => (prev[key] != null ? prev : { ...prev, [key]: 1 }))
+      onBooked?.()
     }
     if (state.error) {
       setCheckMessage(state.error)
       setCheckOk(false)
     }
-  }, [state, bookingDate, scheduleSlotId])
+  }, [state, bookingDate, scheduleSlotId, onBooked])
 
   useEffect(() => {
-    if (sessionUser == null) {
+    if (sessionUser == null || !scheduleSlotId || !bookingDate) {
       setCheckMessage(null)
       setCheckOk(null)
-      setNoClasses(false)
-      setPaymentMethod(null)
-      return
-    }
-    if (!scheduleSlotId || !bookingDate) {
-      setCheckMessage(null)
-      setCheckOk(null)
-      setNoClasses(false)
-      setPaymentMethod(null)
+      setWillBeCharged(null)
+      setTrialAvailable(false)
+      setUseTrialClass(false)
       return
     }
     if (isCurrentBookingConfirmed) {
@@ -163,21 +179,19 @@ function AgendarBookingForm(props: {
     const timer = window.setTimeout(() => {
       checkPublicBookingEligibility(scheduleSlotId, bookingDate).then((res) => {
         if (cancelled) return
-        if (res.ok) {
-          setNoClasses(false)
-          setPaymentMethod(null)
-          setCheckOk(true)
-          setCheckMessage(
-            res.alumnaName ? `Puedes reservar: ${res.alumnaName}` : "Horario disponible",
-          )
-        } else {
-          setNoClasses(res.noClasses === true)
-          if (res.noClasses === true) {
-            setPaymentMethod(null)
-          }
-          setCheckOk(false)
-          setCheckMessage(res.message ?? "No se puede reservar este horario")
-        }
+        setWillBeCharged(res.ok ? (res.willBeCharged ?? null) : null)
+        // La clase muestra viene marcada por defecto: es gratis y de una sola vez.
+        const trial = res.ok && res.trialAvailable === true
+        setTrialAvailable(trial)
+        setUseTrialClass(trial)
+        setCheckOk(res.ok)
+        setCheckMessage(
+          res.ok
+            ? res.alumnaName
+              ? `Puedes reservar: ${res.alumnaName}`
+              : "Horario disponible"
+            : (res.message ?? "No se puede reservar este horario"),
+        )
       })
     }, 400)
     return () => {
@@ -186,48 +200,19 @@ function AgendarBookingForm(props: {
     }
   }, [sessionUser, scheduleSlotId, bookingDate, isCurrentBookingConfirmed])
 
-  async function submitBooking() {
+  function submitBooking() {
     if (isCurrentBookingConfirmed) return
     if (bookingDate === "" || scheduleSlotId === "") return
-    if (noClasses && paymentMethod == null) return
     const fd = new FormData()
     fd.set("bookingDate", bookingDate)
     fd.set("scheduleSlotId", scheduleSlotId)
-    if (paymentMethod != null) {
-      fd.set("paymentMethod", paymentMethod)
+    if (trialAvailable && useTrialClass) {
+      fd.set("useTrialClass", "true")
     }
-    formAction(fd)
-  }
-
-  async function handlePaymentChoice(method: "efectivo" | "transferencia") {
-    if (paymentNotifyPending) return
-    setPaymentNotifyPending(true)
-    setCheckMessage(null)
-    setCheckOk(null)
-
-    const res = await sendBookingPaymentNotificationAction(method)
-    setPaymentNotifyPending(false)
-
-    if (!res.ok) {
-      setCheckOk(false)
-      setCheckMessage(res.error ?? "No se pudo enviar la notificación")
-      return
-    }
-
-    setPaymentMethod(method)
-    setCheckOk(true)
-
-    if (method === "efectivo") {
-      setCheckMessage(
-        "Te enviamos una notificación al panel. Prepárate para pagar en el estudio y confirma tu reserva.",
-      )
-      return
-    }
-
-    setCheckMessage(
-      "Te enviamos los datos de transferencia al panel. Revisa tu notificación para pagar.",
-    )
-    setTransferModalOpen(true)
+    // useActionState exige transición cuando no se invoca desde `action`.
+    startTransition(() => {
+      formAction(fd)
+    })
   }
 
   async function handleLoginSubmit(e: React.FormEvent) {
@@ -265,7 +250,7 @@ function AgendarBookingForm(props: {
     await new Promise<void>((resolve) => {
       window.setTimeout(resolve, 400)
     })
-    await submitBooking()
+    submitBooking()
   }
 
   function handleFormSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -338,65 +323,91 @@ function AgendarBookingForm(props: {
             >
               <option value="">Elige clase y hora</option>
               {slotsForDay.map((slot) => (
-                <option key={slot.id} value={slot.id}>
+                <option key={slot.id} value={slot.id} disabled={slot.free <= 0}>
                   {formatSlotLabel(slot)}
+                  {slot.free <= 0
+                    ? " — Llena"
+                    : ` — ${slot.free} ${slot.free === 1 ? "lugar" : "lugares"}`}
                 </option>
               ))}
             </select>
           )}
         </div>
         {isCurrentBookingConfirmed ? (
-          <p className="text-sm">
-            <span className="font-semibold text-[#1b1a18]">
-              {confirmedBooking?.userName ?? sessionUser?.name ?? "Tu nombre"}
-            </span>
-            <span className="text-green-700">, tu clase quedó confirmada.</span>
-          </p>
-        ) : noClasses && sessionUser != null && scheduleSlotId !== "" ? (
-          <div className="space-y-3 rounded-inner border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <p>{checkMessage}</p>
-            <p className="font-medium">Elige cómo quieres pagar para continuar con tu reserva:</p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                type="button"
-                variant={paymentMethod === "efectivo" ? "default" : "outline"}
-                size="sm"
-                disabled={paymentNotifyPending}
-                onClick={() => void handlePaymentChoice("efectivo")}
-              >
-                {paymentNotifyPending && paymentMethod == null
-                  ? "Enviando..."
-                  : "Pago en efectivo en el estudio"}
-              </Button>
-              <Button
-                type="button"
-                variant={paymentMethod === "transferencia" ? "default" : "outline"}
-                size="sm"
-                disabled={paymentNotifyPending}
-                onClick={() => void handlePaymentChoice("transferencia")}
-              >
-                {paymentNotifyPending && paymentMethod == null
-                  ? "Enviando..."
-                  : "Transferencia"}
-              </Button>
-            </div>
-            {paymentMethod === "efectivo" && checkMessage ? (
-              <p className="text-green-800">{checkMessage}</p>
-            ) : null}
-            {paymentMethod === "transferencia" && checkMessage ? (
-              <div className="space-y-2">
-                <p className="text-green-800">{checkMessage}</p>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 text-green-900"
-                  onClick={() => setTransferModalOpen(true)}
-                >
-                  Ver datos de transferencia
-                </Button>
+          <div className="space-y-2">
+            <p className="text-sm">
+              <span className="font-semibold text-[#1b1a18]">
+                {confirmedBooking?.userName ?? sessionUser?.name ?? "Tu nombre"}
+              </span>
+              <span className="text-green-700">, tu clase quedó confirmada.</span>
+            </p>
+            {state.trialRedeemed ? (
+              <div className="rounded-inner border border-green-base/30 bg-green-base/5 px-4 py-3 text-sm">
+                <p>
+                  Usaste tu <span className="font-semibold">clase muestra</span>, sin costo.
+                  Es una cortesía de una sola vez: las siguientes van con tu plan o se cargan
+                  a tu cuenta.
+                </p>
+              </div>
+            ) : state.pendingAmount != null ? (
+              <div className="rounded-inner border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <p>
+                  Apartaste tu clase sin pago previo. Queda pendiente{" "}
+                  <span className="font-semibold">{formatMxn(state.pendingAmount)}</span>, que
+                  puedes regularizar desde tu cuenta o en el estudio.
+                </p>
               </div>
             ) : null}
+          </div>
+        ) : willBeCharged != null && sessionUser != null && scheduleSlotId !== "" ? (
+          <div className="space-y-3 rounded-inner border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p className="font-medium">No tienes un plan vigente que cubra esta clase.</p>
+            {trialAvailable ? (
+              <>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setUseTrialClass(true)}
+                    className={`w-full rounded-inner border px-3 py-2 text-left transition-colors ${
+                      useTrialClass
+                        ? "border-green-base bg-white"
+                        : "border-black/10 bg-white/60 hover:bg-white"
+                    }`}
+                  >
+                    <span className="block font-medium">Redimir mi clase muestra</span>
+                    <span className="block text-xs text-black/60">
+                      Gratis · una sola vez por cuenta
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseTrialClass(false)}
+                    className={`w-full rounded-inner border px-3 py-2 text-left transition-colors ${
+                      !useTrialClass
+                        ? "border-green-base bg-white"
+                        : "border-black/10 bg-white/60 hover:bg-white"
+                    }`}
+                  >
+                    <span className="block font-medium">Contratar clase individual</span>
+                    <span className="block text-xs text-black/60">
+                      {formatMxn(willBeCharged.priceMxn)} · se carga a tu cuenta y lo
+                      regularizas en el estudio
+                    </span>
+                  </button>
+                </div>
+                <p className="text-xs">
+                  {useTrialClass
+                    ? "Tu clase muestra queda apartada sin costo."
+                    : `Se registrará un adeudo de ${formatMxn(willBeCharged.priceMxn)} en tu cuenta.`}
+                </p>
+              </>
+            ) : (
+              <p>
+                Apartas tu lugar y queda un adeudo de{" "}
+                <span className="font-semibold">{formatMxn(willBeCharged.priceMxn)}</span>. Lo
+                regularizas en el estudio y ellos lo registran como pagado.
+              </p>
+            )}
           </div>
         ) : checkMessage ? (
           <p className={`text-sm ${checkOk ? "text-green-700" : "text-red-600"}`}>
@@ -414,8 +425,7 @@ function AgendarBookingForm(props: {
               isCurrentBookingConfirmed ||
               pending ||
               !canSubmit ||
-              (sessionUser != null && checkOk === false && !noClasses) ||
-              (noClasses && paymentMethod !== "efectivo")
+              (sessionUser != null && checkOk === false)
             }
           >
             {isCurrentBookingConfirmed ? (
@@ -436,26 +446,6 @@ function AgendarBookingForm(props: {
           ) : null}
         </div>
       </form>
-
-      <Dialog open={transferModalOpen} onOpenChange={setTransferModalOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Datos para transferencia</DialogTitle>
-            <DialogDescription>
-              Realiza tu pago con estos datos. En el concepto coloca tu nombre completo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm text-black/80">
-            <p>Banco: Banco Azteca</p>
-            <p>Cuenta: 5263-5401-5974-3604</p>
-            <p>Titular: ADALBERTO RESENDIZ RAGEL</p>
-            <p>Concepto: Tu nombre completo</p>
-          </div>
-          <Button type="button" className="w-full" onClick={() => setTransferModalOpen(false)}>
-            Entendido
-          </Button>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
         <DialogContent className="max-w-md">
@@ -529,6 +519,7 @@ export function AgendarBookingModal(props: {
   onOpenChange: (open: boolean) => void
   initialDate?: string | null
   initialSlotId?: string | null
+  onBooked?: () => void
 }) {
   const [data, setData] = useState<AgendarData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -562,7 +553,7 @@ export function AgendarBookingModal(props: {
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">Agendar clase</DialogTitle>
           <DialogDescription>
-            Elige fecha y horario. Solo se muestran clases con cupo disponible.
+            Elige fecha y horario. Cada opción muestra los lugares que quedan.
           </DialogDescription>
         </DialogHeader>
         {loading ? (
@@ -589,9 +580,11 @@ export function AgendarBookingModal(props: {
             defaultDate={data.defaultDate}
             todayStr={data.todayStr}
             disabledSlotDateKeys={data.disabledSlotDateKeys}
+            bookedBySlotDate={data.bookedBySlotDate}
             initialDate={props.initialDate ?? undefined}
             initialSlotId={props.initialSlotId ?? undefined}
             onClose={handleClose}
+            onBooked={props.onBooked}
           />
         ) : null}
       </DialogContent>

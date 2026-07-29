@@ -85,7 +85,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
         <div data-tour="page-header">
           <h1 className="text-2xl font-semibold tracking-tight">Cupones</h1>
           <p className="text-sm text-muted-foreground">
-            {props.cupones.length} cupones. Úsalos al activar una suscripción para recalcular el precio.
+            {props.cupones.length} cupones. Úsalos al asignar un plan para recalcular el precio.
           </p>
         </div>
         <Dialog
@@ -181,7 +181,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
             {props.cupones.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  Sin cupones. Crea uno para usarlo al activar suscripciones.
+                  Sin cupones. Crea uno para usarlo al asignar planes.
                 </TableCell>
               </TableRow>
             ) : (
@@ -348,7 +348,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
         title="¿Desactivar este cupón?"
         description={
           deleteCoupon != null
-            ? `El cupón ${deleteCoupon.code} dejará de poder usarse en nuevas suscripciones.`
+            ? `El cupón ${deleteCoupon.code} dejará de poder usarse en nuevos planes.`
             : ""
         }
         confirmLabel="Sí, desactivar"

@@ -105,7 +105,6 @@ export async function createCouponAction(
   })
 
   revalidatePath("/dashboard/cupones")
-  revalidatePath("/dashboard/suscripciones")
   return { success: true }
 }
 
@@ -161,7 +160,6 @@ export async function updateCouponAction(
     .where(eq(schema.coupon.id, id))
 
   revalidatePath("/dashboard/cupones")
-  revalidatePath("/dashboard/suscripciones")
   return { success: true }
 }
 
@@ -189,7 +187,6 @@ export async function toggleCouponAction(
     .where(eq(schema.coupon.id, id))
 
   revalidatePath("/dashboard/cupones")
-  revalidatePath("/dashboard/suscripciones")
   return { success: true }
 }
 
@@ -209,6 +206,5 @@ export async function deleteCouponAction(
     .where(eq(schema.coupon.id, id))
 
   revalidatePath("/dashboard/cupones")
-  revalidatePath("/dashboard/suscripciones")
   return { success: true }
 }

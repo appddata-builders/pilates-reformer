@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/shared/ui/card"
 import { Clock } from "lucide-react"
 import { attendanceStatusLabel, formatBookingDate, formatSlotTime } from "@/lib/attendance-report-utils"
 import { formatTimeRange12h } from "@/lib/time-utils"
-import { formatSlotInstructorLabel } from "@/lib/schedule-instructor"
 
 export type HistoricoBookingData = {
   bookingId: string
@@ -32,11 +31,6 @@ export function HistoricoBookingCard(props: {
   const estado = attendanceStatusLabel(b.attended)
   const timeLabel = formatSlotTime(b.startTime)
   const dateLabel = formatBookingDate(toDate(b.bookingDate))
-  const instructorLine = formatSlotInstructorLabel({
-    instructor: b.instructor,
-    alternateInstructor: b.alternateInstructor,
-    scheduleMode: b.scheduleMode,
-  })
 
   return (
     <Card className="flex h-full flex-col gap-0 border py-0 shadow-sm">
@@ -52,9 +46,7 @@ export function HistoricoBookingCard(props: {
                 {b.studentName}
                 {b.studentDisplayId ? ` · ${b.studentDisplayId}` : ""}
               </p>
-            ) : (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{instructorLine}</p>
-            )}
+            ) : null}
           </div>
           <Badge variant="outline" className={`shrink-0 text-xs ${estado.badgeClass}`}>
             {estado.label}
@@ -66,9 +58,6 @@ export function HistoricoBookingCard(props: {
             <Clock className="h-3.5 w-3.5 shrink-0" />
             {formatTimeRange12h(b.startTime, b.endTime)}
           </span>
-          {props.showAlumna && b.studentName ? (
-            <p className="text-xs text-muted-foreground truncate mt-1">Coach: {instructorLine}</p>
-          ) : null}
         </div>
       </CardContent>
     </Card>

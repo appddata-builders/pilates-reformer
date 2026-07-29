@@ -21,6 +21,7 @@ import { eq } from "drizzle-orm"
 import { WelcomeModal } from "./_welcome-modal"
 import { sendTodayBirthdayNotifications } from "@/lib/birthday-notifications"
 import { getStudioBranding } from "@/lib/studio-branding"
+import { DashboardReadyGate } from "@/components/features/admin/dashboard-ready-gate"
 
 export default async function DashboardLayout({
   children,
@@ -109,28 +110,30 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar
-        role={role}
-        navPermissions={navPermissions}
-        studioName={studioBranding.studioName}
-        logoUrl={studioBranding.logoUrl}
-      />
-      <DashboardProviders>
-        <SidebarInset className="min-w-0">
-          <Navbar userName={navName} userEmail={navEmail} />
-          <main className="flex-1 overflow-auto min-w-0">
-            {noNavAccess ? <NoAccessPanel /> : children}
-          </main>
-        </SidebarInset>
-      </DashboardProviders>
-      {showWelcome && (
-        <WelcomeModal
-          template={welcomeTemplate}
-          userName={navName}
-          displayId={welcomeDisplayId}
+    <DashboardReadyGate>
+      <SidebarProvider>
+        <AppSidebar
+          role={role}
+          navPermissions={navPermissions}
+          studioName={studioBranding.studioName}
+          logoUrl={studioBranding.logoUrl}
         />
-      )}
-    </SidebarProvider>
+        <DashboardProviders>
+          <SidebarInset className="min-w-0">
+            <Navbar userName={navName} userEmail={navEmail} />
+            <main className="flex-1 overflow-auto min-w-0">
+              {noNavAccess ? <NoAccessPanel /> : children}
+            </main>
+          </SidebarInset>
+        </DashboardProviders>
+        {showWelcome && (
+          <WelcomeModal
+            template={welcomeTemplate}
+            userName={navName}
+            displayId={welcomeDisplayId}
+          />
+        )}
+      </SidebarProvider>
+    </DashboardReadyGate>
   )
 }

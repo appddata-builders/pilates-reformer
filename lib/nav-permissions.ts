@@ -1,5 +1,6 @@
 import { mainNavItems } from "@/modules/admin/nav-items"
 import { routes } from "@/lib/routes"
+import { ALUMNO_ROLE_LABEL, COACH_ROLE_LABEL } from "@/lib/user-role"
 
 export const CONFIGURABLE_ROLES = ["root", "admin", "coach", "alumno"] as const
 export type ConfigurableRole = (typeof CONFIGURABLE_ROLES)[number]
@@ -7,8 +8,8 @@ export type ConfigurableRole = (typeof CONFIGURABLE_ROLES)[number]
 export const ROLE_LABELS: Record<ConfigurableRole, string> = {
   root: "Root",
   admin: "Admin",
-  coach: "Coach",
-  alumno: "Usuario",
+  coach: COACH_ROLE_LABEL,
+  alumno: ALUMNO_ROLE_LABEL,
 }
 
 export type NavPermissionRow = Record<ConfigurableRole, boolean>
@@ -89,6 +90,8 @@ export function hasNoNavAccess(role: string, permissions?: NavPermissionsMap): b
 export function getDashboardNavKeyForPath(pathname: string): string | null {
   if (pathname === routes.dashboard || pathname === "/dashboard") return "dashboard"
   if (pathname === routes.politica || pathname.startsWith(`${routes.politica}/`)) return "configuracion"
+  // Coaches se fusionó con Usuarios: la ruta vieja sólo redirige a su pestaña.
+  if (pathname === routes.coaches) return "usuarios"
   for (const item of mainNavItems) {
     if (item.url === routes.dashboard) continue
     if (pathname === item.url || pathname.startsWith(`${item.url}/`)) return item.key

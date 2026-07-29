@@ -96,7 +96,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Search
   return (
     <div className="p-6 space-y-6">
       <PageHeader
-        title="Pagos y Suscripciones"
+        title="Pagos"
         description={`Total recaudado: ${totalFormatted}`}
       >
         <Button className="gap-2">

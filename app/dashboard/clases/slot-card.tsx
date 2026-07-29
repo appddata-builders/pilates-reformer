@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Ban, CalendarOff, CircleCheck, Clock, Pencil, Trash2, Users } from "lucide-react"
+import { Ban, CalendarOff, CircleCheck, Pencil, Trash2 } from "lucide-react"
 import { Badge } from "@/components/shared/ui/badge"
 import { Button } from "@/components/shared/ui/button"
 import { Card, CardContent } from "@/components/shared/ui/card"
@@ -30,13 +30,13 @@ import {
   updateSlotAction,
   type ActionState,
 } from "./actions"
-import { formatSlotInstructorLabel } from "@/lib/schedule-instructor"
 import { toLocalDateStr } from "@/lib/booking-slot-options"
 import { formatTime12h, formatTimeRange12h } from "@/lib/time-utils"
 import {
   occurrenceDateForWeek,
   upcomingWeekOptions,
 } from "@/lib/slot-week-options"
+import { OccupancyBar } from "@/components/features/admin/occupancy-bar"
 import { SlotFormFields, type CoachOption, type SlotFormValues } from "./slot-form-fields"
 
 const initial: ActionState = { success: false }
@@ -81,6 +81,9 @@ export type SlotCardData = {
   isActive: boolean
   bookedToday: number
   disabledDates: string[]
+  /** Próxima fecha en que se imparte, para listar a las inscritas. */
+  nextDateStr: string
+  isPast?: boolean
 }
 
 export function SlotCard(props: {
@@ -88,6 +91,8 @@ export function SlotCard(props: {
   coaches: CoachOption[]
   canManage: boolean
   compact?: boolean
+  /** Clase de hoy cuya hora ya terminó: se atenúa. */
+  isPast?: boolean
 }) {
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
@@ -117,13 +122,11 @@ export function SlotCard(props: {
   }, [weekState.success, router])
 
   const slot = props.slot
-  const available = slot.capacity - slot.bookedToday
   const dayName = DAY_NAMES_FULL[slot.dayOfWeek] ?? "—"
   const timeLabel = formatTime12h(slot.startTime)
   const titleLine = props.compact
     ? `${slot.className} · ${timeLabel}`
     : `${slot.className} - ${dayName} ${timeLabel}`
-  const instructorLine = formatSlotInstructorLabel(slot)
   const disabledSet = new Set(slot.disabledDates)
   const weekOptions = upcomingWeekOptions(8).map((week) => {
     const occurrence = occurrenceDateForWeek(slot.dayOfWeek, week.monday)
@@ -140,6 +143,9 @@ export function SlotCard(props: {
     }
   })
   const disabledThisWeekCount = weekOptions.filter((w) => !w.available).length
+  const dimmed = !slot.isActive || props.isPast === true
+  // El tipo repite el nombre en la mayoría de las clases: no lo mostramos dos veces.
+  const typeLabel = classTypeLabel(slot.classType)
 
   const formValues: SlotFormValues = {
     className: slot.className,
@@ -160,162 +166,101 @@ export function SlotCard(props: {
       <DbActionSuccessEffect success={weekState.success} kind="update" />
       <DbActionSuccessEffect success={deleteState.success} kind="delete" />
       <div
-        className={`flex h-full flex-col ${props.compact ? "min-h-0" : "min-h-[220px]"} ${!slot.isActive ? "opacity-60" : ""}`}
+        className={`flex h-full flex-col ${dimmed ? "opacity-55" : ""}`}
       >
-        <Card className="flex min-h-0 flex-1 flex-col gap-0 border py-0 shadow-sm">
-          <CardContent
-            className={`flex h-full min-h-0 flex-1 flex-col ${props.compact ? "p-3" : "p-5"}`}
-          >
-          <div className={`flex items-start justify-between gap-2 ${props.compact ? "mb-1.5" : "mb-2"}`}>
-            <div className="min-w-0 flex-1">
-              <h3
-                className={`font-semibold leading-snug ${props.compact ? "text-sm" : "text-base"}`}
-              >
-                {titleLine}
-              </h3>
-              <p
-                className={`text-muted-foreground truncate ${props.compact ? "text-xs mt-0.5" : "text-sm mt-1"}`}
-              >
-                {instructorLine}
-              </p>
+        <Card className="flex min-h-0 flex-1 flex-col gap-0 border py-0 shadow-sm transition-colors hover:border-primary/40">
+          <CardContent className="flex h-full min-h-0 flex-1 flex-col p-4">
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-lg font-semibold leading-none tabular-nums">
+                {timeLabel}
+              </span>
+              {props.canManage ? (
+                <div className="-mt-1.5 -mr-1.5 flex shrink-0 gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setEditOpen(true)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span className="sr-only">Editar</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Borrar</span>
+                  </Button>
+                </div>
+              ) : null}
             </div>
-            {props.canManage ? (
-            <div className={`flex shrink-0 ${props.compact ? "gap-0.5" : "gap-1"}`}>
-              {slot.isActive ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={props.compact ? "h-7 w-7" : "h-8 w-8"}
-                    onClick={() => setWeeksOpen(true)}
-                  >
-                    <CalendarOff className="h-4 w-4" />
-                    <span className="sr-only">Disponibilidad por semana</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={`text-destructive hover:text-destructive hover:bg-destructive/10 ${props.compact ? "h-7 w-7" : "h-8 w-8"}`}
-                    disabled={togglePending}
-                    onClick={() => setDeactivateOpen(true)}
-                  >
-                    <Ban className="h-4 w-4" />
-                    <span className="sr-only">Desactivar clase</span>
-                  </Button>
-                  <ConfirmRemoveDialog
-                    open={deactivateOpen}
-                    onOpenChange={setDeactivateOpen}
-                    title="¿Desactivar esta clase?"
-                    description={`${titleLine} dejará de aparecer en el horario y no se podrá reservar.`}
-                    confirmLabel="Sí, desactivar"
-                    clientFormAction={toggleAction}
-                    hiddenFields={[
-                      { name: "id", value: slot.id },
-                      { name: "isActive", value: "true" },
-                    ]}
-                    pending={togglePending}
-                  />
-                </>
-              ) : (
-                <form action={toggleAction}>
-                  <input type="hidden" name="id" value={slot.id} />
-                  <input type="hidden" name="isActive" value="false" />
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="icon"
-                    className={`text-green-700 hover:text-green-700 hover:bg-green-100 ${props.compact ? "h-7 w-7" : "h-8 w-8"}`}
-                    disabled={togglePending}
-                  >
-                    <CircleCheck className="h-4 w-4" />
-                    <span className="sr-only">Activar clase</span>
-                  </Button>
-                </form>
+
+            <p className="mt-1 truncate text-sm font-medium">{slot.className}</p>
+            <p className="text-xs text-muted-foreground">
+              {props.compact ? null : `${dayName} · `}
+              {formatTimeRange12h(slot.startTime, slot.endTime)}
+            </p>
+
+            <div className="mt-2 flex flex-wrap gap-1">
+              {typeLabel === slot.className ? null : (
+                <Badge className={`border text-[10px] ${classTypeBadgeClass(slot.classType)}`}>
+                  {typeLabel}
+                </Badge>
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className={props.compact ? "h-7 w-7" : "h-8 w-8"}
-                onClick={() => setEditOpen(true)}
-              >
-                <Pencil className="h-4 w-4" />
-                <span className="sr-only">Editar</span>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className={`text-destructive hover:text-destructive ${props.compact ? "h-7 w-7" : "h-8 w-8"}`}
-                onClick={() => setDeleteOpen(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Borrar</span>
-              </Button>
+              {slot.scheduleMode === "dual" || slot.scheduleMode === "alternating_weekly" ? (
+                <Badge variant="outline" className="border-sky-200 bg-sky-50 text-[10px] text-sky-800">
+                  2 coaches
+                </Badge>
+              ) : null}
+              {!slot.isActive ? (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                  Inactiva
+                </Badge>
+              ) : null}
+              {props.isPast ? (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                  Ya pasó
+                </Badge>
+              ) : null}
+              {slot.isActive && disabledThisWeekCount > 0 ? (
+                <Badge className="border-amber-200 bg-amber-100 text-[10px] text-amber-900">
+                  {disabledThisWeekCount} semana{disabledThisWeekCount === 1 ? "" : "s"} off
+                </Badge>
+              ) : null}
             </div>
-            ) : null}
-          </div>
 
-          <div className={`flex flex-wrap ${props.compact ? "mb-1 gap-1" : "gap-1.5"}`}>
-            {!props.compact ? (
-              <Badge variant="outline" className="text-xs bg-muted/50">
-                {dayName}
-              </Badge>
-            ) : null}
-            <Badge className={`text-xs border ${classTypeBadgeClass(slot.classType)}`}>
-              {classTypeLabel(slot.classType)}
-            </Badge>
-            {slot.scheduleMode === "dual" || slot.scheduleMode === "alternating_weekly" ? (
-              <Badge variant="outline" className="text-xs bg-sky-50 text-sky-800 border-sky-200">
-                2 coaches
-              </Badge>
-            ) : null}
-            {slot.isActive ? (
-              <Badge className="text-xs bg-green-100 text-green-700 border-green-200">Activo</Badge>
-            ) : (
-              <Badge variant="outline" className="text-xs text-muted-foreground">
-                Inactivo
-              </Badge>
-            )}
-            {slot.isActive && disabledThisWeekCount > 0 ? (
-              <Badge className="text-xs bg-amber-100 text-amber-900 border-amber-200">
-                {disabledThisWeekCount} semana{disabledThisWeekCount === 1 ? "" : "s"} off
-              </Badge>
-            ) : null}
-          </div>
-
-          {props.compact ? null : <div className="flex-grow min-h-4" />}
-
-          <div className={`mt-auto shrink-0 border-t ${props.compact ? "pt-2" : "pt-3"}`}>
-            <div
-              className={`flex items-center justify-between text-muted-foreground ${props.compact ? "text-xs" : "text-sm"}`}
-            >
-              <span className="inline-flex items-center gap-1">
-                <Clock className={`shrink-0 ${props.compact ? "h-3.5 w-3.5" : "h-4 w-4"}`} />
-            {formatTimeRange12h(slot.startTime, slot.endTime)}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Users className={`shrink-0 ${props.compact ? "h-3.5 w-3.5" : "h-4 w-4"}`} />
-                <span
-                  className={
-                    available <= 0 ? "text-red-600 font-medium" : "text-foreground font-medium"
-                  }
-                >
-                  {available}
-                </span>
-                {" / "}
-                {slot.capacity} disponibles
-              </span>
+            <div className="mt-3 border-t pt-3">
+              <OccupancyBar
+                booked={slot.bookedToday}
+                capacity={slot.capacity}
+                muted={dimmed}
+              />
             </div>
             {toggleState.error ? (
-              <p className="text-destructive text-xs mt-2">{toggleState.error}</p>
+              <p className="mt-2 text-xs text-destructive">{toggleState.error}</p>
             ) : null}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
       </div>
+
+      <ConfirmRemoveDialog
+        open={deactivateOpen}
+        onOpenChange={setDeactivateOpen}
+        title="¿Desactivar esta clase?"
+        description={`${titleLine} dejará de aparecer en el horario y no se podrá reservar.`}
+        confirmLabel="Sí, desactivar"
+        clientFormAction={toggleAction}
+        hiddenFields={[
+          { name: "id", value: slot.id },
+          { name: "isActive", value: "true" },
+        ]}
+        pending={togglePending}
+      />
 
       <Dialog open={weeksOpen} onOpenChange={setWeeksOpen}>
         <DialogContent className="max-w-md">
@@ -375,22 +320,51 @@ export function SlotCard(props: {
               Guardar cambios
             </Button>
           </form>
-          {slot.isActive ? (
-            <div className="border-t pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                onClick={() => {
-                  setEditOpen(false)
-                  setWeeksOpen(true)
-                }}
-              >
-                <CalendarOff className="h-4 w-4" />
-                Gestionar disponibilidad por semana
-              </Button>
-            </div>
-          ) : null}
+          <div className="space-y-2 border-t pt-4">
+            {slot.isActive ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => {
+                    setEditOpen(false)
+                    setWeeksOpen(true)
+                  }}
+                >
+                  <CalendarOff className="h-4 w-4" />
+                  Gestionar disponibilidad por semana
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={togglePending}
+                  onClick={() => {
+                    setEditOpen(false)
+                    setDeactivateOpen(true)
+                  }}
+                >
+                  <Ban className="h-4 w-4" />
+                  Desactivar clase
+                </Button>
+              </>
+            ) : (
+              <form action={toggleAction}>
+                <input type="hidden" name="id" value={slot.id} />
+                <input type="hidden" name="isActive" value="false" />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="w-full gap-2 border-green-700/40 text-green-700 hover:bg-green-100 hover:text-green-700"
+                  disabled={togglePending}
+                >
+                  <CircleCheck className="h-4 w-4" />
+                  Activar clase
+                </Button>
+              </form>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

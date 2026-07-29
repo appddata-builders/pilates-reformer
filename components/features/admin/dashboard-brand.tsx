@@ -4,8 +4,6 @@ import Image from "next/image"
 import { siteLogo } from "@/lib/site/routes"
 import { cn } from "@/lib/utils"
 
-const LOGO_MARK_BG = "#0D4714"
-
 export function DashboardBrand(props: {
   studioName: string
   logoUrl?: string | null
@@ -22,6 +20,14 @@ export function DashboardBrand(props: {
     <div className={cn("flex items-center gap-3", props.className)}>
       <div
         className="relative h-12 w-12 shrink-0 rounded-full p-5 bg-white overflow-hidden"
+        style={{
+          borderRadius: "9999px",
+          flexShrink: 0,
+          height: 48,
+          overflow: "hidden",
+          position: "relative",
+          width: 48,
+        }}
       >
         <Image
           src={logoSrc}
@@ -29,6 +35,7 @@ export function DashboardBrand(props: {
           fill
           sizes="40px"
           className="object-cover"
+          style={{ objectFit: "cover" }}
           unoptimized={logoSrc.startsWith("http")}
         />
       </div>

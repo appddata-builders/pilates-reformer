@@ -73,6 +73,7 @@ export function AgendarScreen(props: {
         onOpenChange={handleModalOpenChange}
         initialDate={initialDate}
         initialSlotId={initialSlotId}
+        onBooked={() => router.refresh()}
       />
     </div>
   )

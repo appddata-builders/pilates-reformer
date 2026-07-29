@@ -22,7 +22,13 @@ import {
 import { isSlotDisabledOnDate } from "@/lib/slot-exceptions"
 
 export type CreateBookingResult =
-  | { ok: true; bookingId: string; userName: string }
+  | {
+      ok: true
+      bookingId: string
+      userName: string
+      /** false cuando no había plan vigente y la clase queda por cobrar. */
+      coveredByPlan: boolean
+    }
   | { ok: false; message: string }
 
 export async function findUserByDisplayId(db: AnyDb, displayIdRaw: string) {
@@ -145,7 +151,7 @@ export async function checkBookableSubscriptionForUser(
   if (primary == null) {
     return {
       ok: false,
-      message: "No tienes una suscripción activa vigente.",
+      message: "No tienes un plan o paquete vigente.",
       reason: "no_subscription",
     }
   }
@@ -153,7 +159,7 @@ export async function checkBookableSubscriptionForUser(
   if (!isSubscriptionCurrent(primary.status, primary.endDate)) {
     return {
       ok: false,
-      message: "Tu suscripción ya venció. Renueva para reservar.",
+      message: "Tu plan ya venció. Renuévalo para que las clases se descuenten de él.",
       reason: "expired",
     }
   }
@@ -172,7 +178,7 @@ export async function checkBookableSubscriptionForUser(
 
   return {
     ok: false,
-    message: "No tienes clases disponibles en tu suscripción actual.",
+    message: "Ya usaste las clases de tu paquete actual.",
     reason: "no_classes",
     subscriptionId: primary.id,
   }
@@ -185,7 +191,8 @@ export async function createBookingForUser(
     scheduleSlotId: string
     bookingDate: Date
     birthdate?: string | null
-    allowNoClasses?: boolean
+    /** Exige plan vigente con clases. Por defecto se permite reservar y cobrar después. */
+    requirePlan?: boolean
   },
 ): Promise<CreateBookingResult> {
   const [slot] = await db
@@ -256,19 +263,13 @@ export async function createBookingForUser(
     return { ok: false, message: bookingCheck.message }
   }
 
+  // El plan ya no es requisito para reservar: si no lo cubre, la clase se cobra
+  // después y el estudio regulariza el pago.
   const subCheck = await checkBookableSubscriptionForUser(db, params.userId)
-  let subscriptionId: string | null = null
+  const subscriptionId = subCheck.ok ? subCheck.subscriptionId : null
 
-  if (subCheck.ok) {
-    subscriptionId = subCheck.subscriptionId
-  } else if (
-    params.allowNoClasses === true &&
-    subCheck.reason === "no_classes" &&
-    subCheck.subscriptionId != null
-  ) {
-    subscriptionId = subCheck.subscriptionId
-  } else {
-    return { ok: false, message: subCheck.message }
+  if (subscriptionId == null && params.requirePlan === true) {
+    return { ok: false, message: subCheck.ok ? "" : subCheck.message }
   }
 
   const bookingId = crypto.randomUUID()
@@ -280,7 +281,9 @@ export async function createBookingForUser(
     status: "confirmed",
   })
 
-  await consumeClassFromSubscription(subscriptionId)
+  if (subscriptionId != null) {
+    await consumeClassFromSubscription(subscriptionId)
+  }
 
   const [user] = await db
     .select({ name: schema.user.name })
@@ -292,6 +295,7 @@ export async function createBookingForUser(
     ok: true,
     bookingId,
     userName: user?.name ?? "Usuario",
+    coveredByPlan: subscriptionId != null,
   }
 }
 

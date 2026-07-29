@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic"
 
 import Link from "next/link"
+import { headers } from "next/headers"
 import { notFound } from "next/navigation"
+import { auth } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { PageHeader } from "@/components/features/admin/page-header"
@@ -13,6 +15,7 @@ import {
 import { Badge } from "@/components/shared/ui/badge"
 import { Button } from "@/components/shared/ui/button"
 import { routes } from "@/lib/routes"
+import { ALUMNO_ROLE_LABEL } from "@/lib/user-role"
 import { and, desc, eq } from "drizzle-orm"
 import { formatBirthdateDisplay } from "@/lib/birthdate"
 import { ConfirmPaymentButton } from "@/app/dashboard/pagos/confirm-payment-button"
@@ -33,6 +36,14 @@ function paymentStatusBadge(status: string) {
 export default async function AlumnoDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params
   const db = getDb()
+
+  // Confirmar cobros es de admin y root, no de un coach que llegue a la ficha.
+  const session = await auth.api.getSession({
+    headers: await headers(),
+    query: { disableRefresh: true },
+  })
+  const sessionRole = session?.user.role ?? ""
+  const canManage = sessionRole === "admin" || sessionRole === "root"
 
   const [alumno] = await db
     .select()
@@ -135,7 +146,7 @@ export default async function AlumnoDetailPage(props: { params: Promise<{ id: st
         }
       >
         <div className="flex flex-wrap items-center gap-2">
-          {pendingPayment != null ? (
+          {canManage && pendingPayment != null ? (
             <ConfirmPaymentButton
               paymentId={pendingPayment.id}
               userName={alumno.name}
@@ -157,6 +168,10 @@ export default async function AlumnoDetailPage(props: { params: Promise<{ id: st
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">ID</span>
               <span className="font-mono">{alumno.displayId ?? "—"}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Rol</span>
+              <Badge variant="outline">{ALUMNO_ROLE_LABEL}</Badge>
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Teléfono</span>
@@ -289,7 +304,7 @@ export default async function AlumnoDetailPage(props: { params: Promise<{ id: st
                       <TableCell className="capitalize">{p.method}</TableCell>
                       <TableCell>{paymentStatusBadge(p.status)}</TableCell>
                       <TableCell className="text-right">
-                        {p.status === "pending" ? (
+                        {canManage && p.status === "pending" ? (
                           <ConfirmPaymentButton
                             paymentId={p.id}
                             userName={alumno.name}

@@ -265,3 +265,4 @@ export async function setSlotWeekAvailabilityAction(
   revalidatePath("/dashboard/reservas")
   return { success: true }
 }
+

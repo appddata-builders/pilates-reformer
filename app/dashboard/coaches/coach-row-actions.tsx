@@ -24,6 +24,8 @@ import { useRouter } from "next/navigation"
 import { DbActionSuccessEffect } from "@/components/features/admin/db-action-feedback"
 import { ConfirmRemoveDialog } from "@/components/features/admin/confirm-remove-dialog"
 import { ResetPasswordControl } from "@/components/features/admin/reset-password-control"
+import { ChangeRoleControl } from "@/components/features/admin/change-role-control"
+import { ALUMNO_ROLE_LABEL, COACH_ROLE_LABEL } from "@/lib/user-role"
 import {
   deleteCoachAction,
   resetCoachPasswordAction,
@@ -118,6 +120,11 @@ export function CoachRowActions(props: { coach: CoachRowData }) {
           userLabel={props.coach.name}
           resetAction={resetCoachPasswordAction}
         />
+        <ChangeRoleControl
+          userId={props.coach.id}
+          userLabel={props.coach.name}
+          currentRole="coach"
+        />
         <Button
           type="button"
           variant="ghost"
@@ -141,12 +148,13 @@ export function CoachRowActions(props: { coach: CoachRowData }) {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 p-0">
+          <DialogHeader className="shrink-0 border-b px-6 py-4">
             <DialogTitle>Editar coach</DialogTitle>
           </DialogHeader>
-          <form action={editAction} className="space-y-4">
+          <form action={editAction} className="flex min-h-0 flex-1 flex-col">
             <input type="hidden" name="id" value={props.coach.id} />
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
             <div className="space-y-2">
               <Label htmlFor={`edit-coach-name-${props.coach.id}`}>Nombre completo</Label>
               <Input
@@ -183,6 +191,21 @@ export function CoachRowActions(props: { coach: CoachRowData }) {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor={`edit-coach-role-${props.coach.id}`}>Rol</Label>
+              <select
+                id={`edit-coach-role-${props.coach.id}`}
+                name="role"
+                defaultValue="coach"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="coach">{COACH_ROLE_LABEL}</option>
+                <option value="alumno">{ALUMNO_ROLE_LABEL}</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Al guardarlo como {ALUMNO_ROLE_LABEL} pasa a la lista de Usuarios.
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor={`edit-coach-enabled-${props.coach.id}`}>Acceso al panel</Label>
               <select
                 id={`edit-coach-enabled-${props.coach.id}`}
@@ -194,11 +217,18 @@ export function CoachRowActions(props: { coach: CoachRowData }) {
                 <option value="false">Inhabilitado</option>
               </select>
             </div>
-            {editState.error ? <p className="text-destructive text-sm">{editState.error}</p> : null}
-            {toggleState.error ? <p className="text-destructive text-sm">{toggleState.error}</p> : null}
-            <Button type="submit" className="w-full" disabled={editPending}>
-              Guardar cambios
-            </Button>
+              {editState.error ? (
+                <p className="text-destructive text-sm">{editState.error}</p>
+              ) : null}
+              {toggleState.error ? (
+                <p className="text-destructive text-sm">{toggleState.error}</p>
+              ) : null}
+            </div>
+            <div className="shrink-0 border-t px-6 py-4">
+              <Button type="submit" className="w-full" disabled={editPending}>
+                Guardar cambios
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

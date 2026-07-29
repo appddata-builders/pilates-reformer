@@ -25,6 +25,8 @@ import { Textarea } from "@/components/shared/ui/textarea"
 import { DbActionSuccessEffect } from "@/components/features/admin/db-action-feedback"
 import { ConfirmRemoveDialog } from "@/components/features/admin/confirm-remove-dialog"
 import { ResetPasswordControl } from "@/components/features/admin/reset-password-control"
+import { ChangeRoleControl } from "@/components/features/admin/change-role-control"
+import { ALUMNO_ROLE_LABEL, COACH_ROLE_LABEL } from "@/lib/user-role"
 import {
   deleteAlumnoAction,
   resetAlumnoPasswordAction,
@@ -136,6 +138,11 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
           userLabel={displayLabel}
           resetAction={resetAlumnoPasswordAction}
         />
+        <ChangeRoleControl
+          userId={props.alumno.id}
+          userLabel={displayLabel}
+          currentRole="alumno"
+        />
         <Button
           type="button"
           variant="ghost"
@@ -159,12 +166,13 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 p-0">
+          <DialogHeader className="shrink-0 border-b px-6 py-4">
             <DialogTitle>Editar usuario</DialogTitle>
           </DialogHeader>
-          <form action={editAction} className="space-y-4">
+          <form action={editAction} className="flex min-h-0 flex-1 flex-col">
             <input type="hidden" name="id" value={props.alumno.id} />
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
             <div className="space-y-2">
               <Label htmlFor={`edit-name-${props.alumno.id}`}>Nombre completo</Label>
               <Input
@@ -228,6 +236,21 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
               showStartDate
             />
             <div className="space-y-2">
+              <Label htmlFor={`edit-role-${props.alumno.id}`}>Rol</Label>
+              <select
+                id={`edit-role-${props.alumno.id}`}
+                name="role"
+                defaultValue="alumno"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="alumno">{ALUMNO_ROLE_LABEL}</option>
+                <option value="coach">{COACH_ROLE_LABEL}</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Al guardarlo como {COACH_ROLE_LABEL} pasa a la lista de Coaches.
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor={`edit-enabled-${props.alumno.id}`}>Acceso al panel</Label>
               <select
                 id={`edit-enabled-${props.alumno.id}`}
@@ -239,11 +262,18 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
                 <option value="false">Inhabilitado</option>
               </select>
             </div>
-            {editState.error ? <p className="text-destructive text-sm">{editState.error}</p> : null}
-            {toggleState.error ? <p className="text-destructive text-sm">{toggleState.error}</p> : null}
-            <Button type="submit" className="w-full" disabled={editPending}>
-              Guardar cambios
-            </Button>
+              {editState.error ? (
+                <p className="text-destructive text-sm">{editState.error}</p>
+              ) : null}
+              {toggleState.error ? (
+                <p className="text-destructive text-sm">{toggleState.error}</p>
+              ) : null}
+            </div>
+            <div className="shrink-0 border-t px-6 py-4">
+              <Button type="submit" className="w-full" disabled={editPending}>
+                Guardar cambios
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
@@ -254,7 +284,7 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
             <AlertDialogTitle>¿Borrar este usuario?</AlertDialogTitle>
             <AlertDialogDescription>
               Se eliminará el registro de {displayLabel} ({props.alumno.name}), incluyendo
-              reservas, pagos y suscripciones asociadas. Esta acción no se puede deshacer.
+              reservas, pagos y planes asociados. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteState.error ? (

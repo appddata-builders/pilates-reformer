@@ -14,11 +14,6 @@ import { countAttendanceStats } from "@/lib/attendance-report-utils"
 import { getFirstAllowedDashboardUrl } from "@/lib/nav-permissions"
 import { routes } from "@/lib/routes"
 import {
-  getCoachSessionInfo,
-  slotVisibleToCoach,
-} from "@/lib/coach-schedule-visibility"
-import { coachTeachesSlot } from "@/lib/schedule-instructor"
-import {
   HistoricoBookingCard,
   type HistoricoBookingData,
 } from "./historico-booking-card"
@@ -46,9 +41,6 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
   const isAlumno = isAlumnoRole(role)
   const isAdminRoot = isAdminOrRoot(role)
   const isCoach = role === "coach"
-  const coachSession = getCoachSessionInfo(session?.user)
-  const coachName =
-    typeof session?.user?.name === "string" ? session.user.name.trim() : ""
 
   if (!session || (!isAlumno && !isAdminRoot && !isCoach)) {
     redirect(getFirstAllowedDashboardUrl(role))
@@ -116,7 +108,7 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
     .where(and(...bookingConditions))
     .orderBy(desc(schema.booking.bookingDate), schema.scheduleSlot.startTime)
 
-  let bookings: HistoricoBookingData[] = rawRows.map((row) => ({
+  const bookings: HistoricoBookingData[] = rawRows.map((row) => ({
     bookingId: row.bookingId,
     bookingDate: toTs(row.bookingDate),
     attended: row.attended,
@@ -130,28 +122,6 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
     studentDisplayId: row.studentDisplayId,
   }))
 
-  if (isCoach && coachName.length > 0) {
-    bookings = bookings.filter((row) =>
-      coachSession != null
-        ? slotVisibleToCoach(
-            {
-              instructor: row.instructor,
-              alternateInstructor: row.alternateInstructor,
-              scheduleMode: row.scheduleMode,
-            },
-            coachSession,
-          )
-        : coachTeachesSlot(
-            {
-              instructor: row.instructor,
-              alternateInstructor: row.alternateInstructor,
-              scheduleMode: row.scheduleMode,
-            },
-            coachName,
-          ),
-    )
-  }
-
   const stats = countAttendanceStats(bookings)
   const showAlumnaOnCard = isAdminRoot || isCoach
 
@@ -163,7 +133,7 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
   const description = isAlumno
     ? `${bookings.length} ${bookings.length === 1 ? "clase reservada" : "clases reservadas"} en el periodo`
     : isCoach
-      ? `${bookings.length} reservas en tus clases asignadas`
+      ? `${bookings.length} reservas confirmadas en el periodo`
       : alumnaFilter.length > 0
         ? (() => {
             const a = alumnas.find((x) => x.id === alumnaFilter)
@@ -255,7 +225,10 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
         <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {bookings.map((booking) => (
             <div key={booking.bookingId} className="h-full">
-              <HistoricoBookingCard booking={booking} showAlumna={showAlumnaOnCard} />
+              <HistoricoBookingCard
+                booking={booking}
+                showAlumna={showAlumnaOnCard}
+              />
             </div>
           ))}
         </div>

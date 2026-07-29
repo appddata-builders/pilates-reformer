@@ -17,10 +17,15 @@ import { createSlotAction, type ActionState } from "./actions"
 import { SlotCard, type SlotCardData } from "./slot-card"
 import { SlotFormFields, type CoachOption } from "./slot-form-fields"
 
+/** Días de la semana en curso que ya quedaron atrás (domingo no cuenta). */
+function isWeekdayPast(dayOfWeek: number, todayDow: number): boolean {
+  if (todayDow === 0) return false
+  return dayOfWeek > 0 && dayOfWeek < todayDow
+}
+
 const initial: ActionState = { success: false }
 
 const CLASES_DAY_STORAGE_KEY = "pilates_clases_day"
-const DEFAULT_DAY = "1"
 
 const DAY_TABS = [
   { value: "1", label: "Lunes" },
@@ -40,33 +45,42 @@ export function ClasesClient(props: {
   activeCount: number
   coaches: CoachOption[]
   canManage: boolean
+  todayDow: number
+  todayKey: string
 }) {
+  // Domingo no tiene pestaña: en ese caso se arranca en lunes.
+  const todayTab = isValidDayValue(String(props.todayDow)) ? String(props.todayDow) : "1"
+
   const [createOpen, setCreateOpen] = useState(false)
-  const [selectedDay, setSelectedDay] = useState(DEFAULT_DAY)
+  const [selectedDay, setSelectedDay] = useState(todayTab)
   const [dayReady, setDayReady] = useState(false)
   const [createState, createAction, createPending] = useActionState(createSlotAction, initial)
 
+  // La preferencia sólo vale dentro del mismo día: al día siguiente vuelve a hoy.
   useEffect(() => {
-    let next = DEFAULT_DAY
+    let next = todayTab
     try {
       const stored = window.localStorage.getItem(CLASES_DAY_STORAGE_KEY)
-      if (stored != null && isValidDayValue(stored)) {
-        next = stored
+      if (stored != null) {
+        const [storedKey, storedDay] = stored.split("|")
+        if (storedKey === props.todayKey && storedDay != null && isValidDayValue(storedDay)) {
+          next = storedDay
+        }
       }
     } catch {
-      next = DEFAULT_DAY
+      next = todayTab
     }
     setSelectedDay(next)
     setDayReady(true)
-  }, [])
+  }, [todayTab, props.todayKey])
 
   useEffect(() => {
     if (!dayReady) return
     try {
-      window.localStorage.setItem(CLASES_DAY_STORAGE_KEY, selectedDay)
+      window.localStorage.setItem(CLASES_DAY_STORAGE_KEY, `${props.todayKey}|${selectedDay}`)
     } catch {
     }
-  }, [selectedDay, dayReady])
+  }, [selectedDay, dayReady, props.todayKey])
 
   useEffect(() => {
     if (createState.success) setCreateOpen(false)
@@ -131,12 +145,22 @@ export function ClasesClient(props: {
         <Tabs value={selectedDay} onValueChange={setSelectedDay} className="space-y-4">
           <TabsList className="flex h-auto w-full flex-wrap gap-1 p-1 sm:w-fit">
             {DAY_TABS.map((tab) => {
-              const count = props.slots.filter((slot) => slot.dayOfWeek === Number(tab.value)).length
+              const dow = Number(tab.value)
+              const count = props.slots.filter((slot) => slot.dayOfWeek === dow).length
+              const isToday = dow === props.todayDow
+              const isPastDay = isWeekdayPast(dow, props.todayDow)
               return (
-                <TabsTrigger key={tab.value} value={tab.value} className="px-3 py-1.5 text-sm">
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={`px-3 py-1.5 text-sm ${isPastDay ? "opacity-55" : ""}`}
+                >
                   {tab.label}
                   {count > 0 ? (
                     <span className="text-muted-foreground ml-1 text-xs">({count})</span>
+                  ) : null}
+                  {isToday ? (
+                    <span className="ml-1.5 inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
                   ) : null}
                 </TabsTrigger>
               )
@@ -144,7 +168,15 @@ export function ClasesClient(props: {
           </TabsList>
 
           <p className="text-sm text-muted-foreground">
-            {selectedDayLabel}: {daySlots.length} clase{daySlots.length === 1 ? "" : "s"} ·{" "}
+            {selectedDayLabel}
+            {selectedDay === String(props.todayDow) ? (
+              <span className="ml-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                Hoy
+              </span>
+            ) : isWeekdayPast(Number(selectedDay), props.todayDow) ? (
+              <span className="ml-1.5 text-xs">(ya pasó esta semana)</span>
+            ) : null}
+            : {daySlots.length} clase{daySlots.length === 1 ? "" : "s"} ·{" "}
             {dayActiveCount} activa{dayActiveCount === 1 ? "" : "s"}
           </p>
 
@@ -159,7 +191,13 @@ export function ClasesClient(props: {
             >
               {daySlots.map((slot) => (
                 <div key={slot.id} className="h-full">
-                  <SlotCard slot={slot} coaches={props.coaches} canManage={props.canManage} compact />
+                  <SlotCard
+                    slot={slot}
+                    coaches={props.coaches}
+                    canManage={props.canManage}
+                    isPast={slot.isPast}
+                    compact
+                  />
                 </div>
               ))}
             </div>

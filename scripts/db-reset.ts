@@ -36,7 +36,6 @@ const PG_TABLES = [
   "studio_event",
   "studio_kpi_snapshot",
   "coach_payroll_period",
-  "refund",
   "sale_item",
   "payment",
   "booking",

@@ -6,7 +6,7 @@ export type BookingSlotOption = {
   startTime: string
   endTime: string | null
   className: string
-  instructor: string | null
+  capacity: number
 }
 
 export function getDayOfWeekFromDateStr(dateStr: string): number | null {

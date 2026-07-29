@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/shared/ui/card"
 import { Clock } from "lucide-react"
 import { formatSlotTime } from "@/lib/attendance-report-utils"
 import { formatTimeRange12h } from "@/lib/time-utils"
-import { formatSlotInstructorLabel } from "@/lib/schedule-instructor"
 import { CancelBookingButton } from "./cancel-booking-button"
 
 export type ReservaCardData = {
@@ -51,11 +50,6 @@ export function ReservaCard(props: {
 }) {
   const r = props.reserva
   const timeLabel = formatSlotTime(r.startTime)
-  const instructorLine = formatSlotInstructorLabel({
-    instructor: r.instructor,
-    alternateInstructor: r.alternateInstructor,
-    scheduleMode: r.scheduleMode,
-  })
   const cancelMode = props.cancelMode ?? "admin"
   const showCancel =
     props.canCancel === true &&
@@ -75,9 +69,7 @@ export function ReservaCard(props: {
                 {r.studentName}
                 {r.studentDisplayId ? ` · ${r.studentDisplayId}` : ""}
               </p>
-            ) : (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">{instructorLine}</p>
-            )}
+            ) : null}
           </div>
           {statusBadge(r.status)}
         </div>
@@ -95,9 +87,6 @@ export function ReservaCard(props: {
             />
           ) : null}
         </div>
-        {props.showAlumna && r.studentName ? (
-          <p className="text-xs text-muted-foreground truncate mt-1">Coach: {instructorLine}</p>
-        ) : null}
       </CardContent>
     </Card>
   )

@@ -20,8 +20,6 @@ import {
   scheduleTimes,
 } from "../lib/site/schedule"
 
-const MORNING_INSTRUCTOR = "Elena Morales"
-const EVENING_INSTRUCTOR = "Lucía Paredes"
 
 function weeksIn(durationDays: number): number {
   return Math.max(1, Math.round(durationDays / 7))
@@ -81,8 +79,9 @@ function main() {
       const values = {
         id: `slot-d${day.dayOfWeek}-t${startTime.replace(":", "")}`,
         className: "Pilates Reformer",
-        instructor: startTime < "12:00" ? MORNING_INSTRUCTOR : EVENING_INSTRUCTOR,
-        alternateInstructor: isDual ? EVENING_INSTRUCTOR : null,
+        // Sin instructor: se asigna desde el panel cuando hay coaches reales.
+        instructor: null,
+        alternateInstructor: null,
         scheduleMode: isDual ? "dual" : "fixed",
         dayOfWeek: day.dayOfWeek,
         startTime,

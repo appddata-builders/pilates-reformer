@@ -1,6 +1,8 @@
 export const routes = {
   registry: "/registry",
   login: "/login",
+  recuperarPassword: "/recuperar-password",
+  restablecerPassword: "/restablecer-password",
   agendar: "/agendar",
   dashboard: "/dashboard",
   cuenta: "/dashboard",
@@ -9,7 +11,6 @@ export const routes = {
   clases: "/dashboard/clases",
   reservas: "/dashboard/reservas",
   pagos: "/dashboard/pagos",
-  suscripciones: "/dashboard/suscripciones",
   planes: "/dashboard/planes",
   cupones: "/dashboard/cupones",
   coaches: "/dashboard/coaches",
@@ -19,6 +20,5 @@ export const routes = {
   politica: "/dashboard/politica",
   configuracion: "/dashboard/configuracion",
   calendario: "/dashboard/calendario",
-  devoluciones: "/dashboard/devoluciones",
   historico: "/dashboard/historico",
 } as const

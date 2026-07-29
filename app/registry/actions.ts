@@ -29,7 +29,6 @@ export type RegistryActionState = {
   error?: string
   fieldErrors?: Record<string, string[]>
   displayId?: string
-  role?: "alumno" | "coach"
 }
 
 function getRegistryTokenFromForm(formData: FormData): string | undefined {

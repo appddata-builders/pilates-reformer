@@ -1,9 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
-import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/shared/ui/button"
 import { Input } from "@/components/shared/ui/input"
 import { Label } from "@/components/shared/ui/label"
@@ -17,6 +16,7 @@ import { signInByDisplayId } from "@/lib/sign-in-by-display-id"
 import { routes } from "@/lib/routes"
 
 const CONNECTION_ERROR_MSG = "Problemas de conexión. Vuelva a intentar más tarde."
+const DISABLED_MSG = "Tu cuenta está inhabilitada. Contacta al estudio."
 
 async function waitForSessionUser() {
   for (let i = 0; i < 40; i++) {
@@ -27,15 +27,17 @@ async function waitForSessionUser() {
   return null
 }
 
-export function LoginForm(props: { studioName: string; logoUrl: string | null }) {
-  const router = useRouter()
-  const pathname = usePathname()
+export function LoginForm(props: {
+  studioName: string
+  logoUrl: string | null
+  accountDisabled: boolean
+  initialError: string | null
+}) {
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [overlayActive, setOverlayActive] = useState(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const redirectingRef = useRef(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(props.initialError)
 
   const handleConnectionTimeout = useCallback(async function handleConnectionTimeout() {
     const s = await authClient.getSession()
@@ -47,57 +49,24 @@ export function LoginForm(props: { studioName: string; logoUrl: string | null })
         return
       }
     }
-    redirectingRef.current = false
     setOverlayActive(false)
     setErrorMsg(CONNECTION_ERROR_MSG)
   }, [])
 
+  // La sesión ya se validó en el servidor: acá sólo limpiamos la cookie
+  // de una cuenta inhabilitada para que no quede colgada.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get("inhabilitado") === "1") {
-      setErrorMsg("Tu cuenta está inhabilitada. Contacta al estudio.")
-    }
-  }, [])
-
-  useEffect(() => {
-    if (pathname !== routes.login) return
-    if (redirectingRef.current) return
-
-    const params = new URLSearchParams(window.location.search)
-    if (params.get("signedOut") === "1") {
-      window.history.replaceState(null, "", routes.login)
-      return
-    }
-
-    let cancelled = false
-    void authClient.getSession().then((s) => {
-      if (cancelled) return
-      if (redirectingRef.current) return
-      const user = s.data?.user
-      if (user == null) return
-      const enabled = (user as { enabled?: boolean }).enabled
-      if (enabled === false) {
-        void authClient.signOut()
-        setErrorMsg("Tu cuenta está inhabilitada. Contacta al estudio.")
-        return
-      }
-      router.replace(routes.dashboard)
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [pathname, router])
+    if (!props.accountDisabled) return
+    void authClient.signOut()
+  }, [props.accountDisabled])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErrorMsg(null)
-    redirectingRef.current = true
     setOverlayActive(true)
 
     const signIn = await signInByDisplayId(identifier, password)
     if (!signIn.ok) {
-      redirectingRef.current = false
       setOverlayActive(false)
       setErrorMsg(signIn.error)
       return
@@ -105,7 +74,6 @@ export function LoginForm(props: { studioName: string; logoUrl: string | null })
 
     const user = await waitForSessionUser()
     if (user == null) {
-      redirectingRef.current = false
       setOverlayActive(false)
       setErrorMsg(CONNECTION_ERROR_MSG)
       return
@@ -114,9 +82,8 @@ export function LoginForm(props: { studioName: string; logoUrl: string | null })
     const enabled = (user as { enabled?: boolean }).enabled
     if (enabled === false) {
       await authClient.signOut()
-      redirectingRef.current = false
       setOverlayActive(false)
-      setErrorMsg("Tu cuenta está inhabilitada. Contacta al estudio.")
+      setErrorMsg(DISABLED_MSG)
       return
     }
 
@@ -158,7 +125,15 @@ export function LoginForm(props: { studioName: string; logoUrl: string | null })
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Link
+                    href={routes.recuperarPassword}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
                 <div className="relative">
                   <Input
                     id="password"

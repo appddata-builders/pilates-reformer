@@ -34,7 +34,7 @@ export function NewAlumnoDialog(props: { planes: PlanOption[] }) {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <UserPlus className="h-4 w-4" />
-          Nuevo usuario
+          Alumn@
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">

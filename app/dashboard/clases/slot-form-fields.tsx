@@ -240,8 +240,8 @@ export function SlotFormFields(props: {
       </div>
       {props.showWeekAvailabilityHint ? (
         <p className="text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2">
-          Para marcar una semana como no disponible (sin borrar el horario), usa el botón de calendario
-          en la tarjeta o “Gestionar disponibilidad por semana”.
+          Para marcar una semana como no disponible sin borrar el horario, usa “Gestionar
+          disponibilidad por semana” aquí abajo.
         </p>
       ) : null}
     </>

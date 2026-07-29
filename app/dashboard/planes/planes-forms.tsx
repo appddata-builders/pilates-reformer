@@ -432,7 +432,7 @@ export function PlanesFormsClient(props: { planes: PlanRow[]; embedded?: boolean
         title="¿Borrar este plan?"
         description={
           deletePlan != null
-            ? `El plan "${deletePlan.name}" dejará de ofrecerse. Si no tiene suscripciones se elimina por completo; si las tiene, se desactiva y ya no aparecerá para nuevas altas.`
+            ? `El plan "${deletePlan.name}" dejará de ofrecerse. Si nadie lo ha contratado se elimina por completo; si ya se vendió, se desactiva y no aparecerá para nuevas altas.`
             : ""
         }
         confirmLabel="Sí, borrar"

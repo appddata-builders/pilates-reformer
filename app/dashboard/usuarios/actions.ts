@@ -14,6 +14,8 @@ import { applyUserPlan } from "@/lib/activate-subscription"
 import { revokeUserSessions } from "@/lib/revoke-user-sessions"
 import { resetUserPassword } from "@/lib/reset-user-password"
 import { routes } from "@/lib/routes"
+import { parseManageableRole } from "@/lib/user-role"
+import { changeUserRole } from "@/lib/user-role.server"
 import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding"
 
 const createAlumnoSchema = z.object({
@@ -42,6 +44,7 @@ const updateAlumnoSchema = z.object({
     .optional(),
   startDate: z.string().optional(),
   enabled: z.enum(["true", "false"]).optional(),
+  role: z.enum(["alumno", "coach"]).optional(),
 })
 
 export type ActionState = {
@@ -159,7 +162,6 @@ export async function createAlumnoAction(
     }
 
     revalidatePath(routes.usuarios)
-    revalidatePath("/dashboard/suscripciones")
     revalidatePath("/dashboard/pagos")
     return { success: true, displayId }
   } catch (e) {
@@ -189,6 +191,7 @@ export async function updateAlumnoAction(
     billingCycle: formData.get("billingCycle") || undefined,
     startDate: formData.get("startDate") || undefined,
     enabled: formData.get("enabled") ?? undefined,
+    role: formData.get("role") || undefined,
   })
   if (!parsed.success) {
     return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
@@ -234,8 +237,13 @@ export async function updateAlumnoAction(
     .where(eq(schema.user.id, parsed.data.id))
     .limit(1)
 
-  if (existing == null || existing.role !== "alumno") {
+  if (existing == null || parseManageableRole(existing.role) == null) {
     return { success: false, error: "Usuario no encontrado" }
+  }
+
+  const roleNext = parsed.data.role ?? null
+  if (roleNext != null && roleNext !== existing.role && session.user.id === parsed.data.id) {
+    return { success: false, error: "No puedes cambiar tu propio rol" }
   }
 
   if (parsed.data.email !== existing.email) {
@@ -278,8 +286,21 @@ export async function updateAlumnoAction(
       }
     }
 
+    // El cambio de rol va al final: mueve al usuario de lista y limpia
+    // los horarios donde figuraba como instructor.
+    if (roleNext != null && roleNext !== existing.role) {
+      const roleResult = await changeUserRole(db, {
+        userId: parsed.data.id,
+        nextRole: roleNext,
+      })
+      if (!roleResult.ok) {
+        return { success: false, error: roleResult.error }
+      }
+      revalidatePath(routes.coaches)
+      revalidatePath(routes.clases)
+    }
+
     revalidatePath(routes.usuarios)
-    revalidatePath("/dashboard/suscripciones")
     revalidatePath("/dashboard/pagos")
     revalidatePath(routes.usuarioDetail(parsed.data.id))
     return { success: true }
@@ -398,10 +419,6 @@ export async function deleteAlumnoAction(
       .update(schema.saleItem)
       .set({ userId: null })
       .where(eq(schema.saleItem.userId, id))
-    await db
-      .update(schema.refund)
-      .set({ processedBy: null })
-      .where(eq(schema.refund.processedBy, id))
     await db
       .update(schema.studioEvent)
       .set({ createdBy: null })

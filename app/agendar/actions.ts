@@ -3,7 +3,7 @@
 import { z } from "zod"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
-import { asc, eq } from "drizzle-orm"
+import { and, asc, eq, gte, lte } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
@@ -13,6 +13,12 @@ import {
   checkBookableSubscriptionForUser,
   checkSlotCapacityForBooking,
 } from "@/lib/booking-service"
+import {
+  chargeIndividualClass,
+  consumeTrialClass,
+  getIndividualClassPlan,
+  hasUsedTrialClass,
+} from "@/lib/class-charge"
 import { validateBookingAgeForSlot } from "@/lib/booking-rules"
 import {
   classEndFromBooking,
@@ -23,11 +29,8 @@ import {
   type BookingSlotOption,
   localTodayStr,
   resolveBookingDefaultDate,
+  toLocalDateStr,
 } from "@/lib/booking-slot-options"
-import {
-  sendStudioPaymentNotification,
-  sendTransferPaymentNotification,
-} from "@/lib/payment-notifications"
 import { isSlotDisabledOnDate, listDisabledSlotDateKeys } from "@/lib/slot-exceptions"
 import { loadLandingScheduleBoard } from "@/lib/site/schedule-board.server"
 import { getMondayOfWeek } from "@/lib/site/schedule"
@@ -37,6 +40,10 @@ export type PublicBookingState = {
   error?: string
   message?: string
   bookedDate?: string
+  /** Importe que queda por regularizar cuando la clase no la cubrió un plan. */
+  pendingAmount?: number
+  /** La reserva se cubrió con la clase muestra, sin costo. */
+  trialRedeemed?: boolean
 }
 
 export type AgendarData = {
@@ -44,12 +51,15 @@ export type AgendarData = {
   defaultDate: string
   todayStr: string
   disabledSlotDateKeys: string[]
+  /** Reservas confirmadas por `slotId|YYYY-MM-DD`; sólo las que tienen alguna. */
+  bookedBySlotDate: Record<string, number>
+  individualClassPrice: number | null
 }
 
 const publicBookingSchema = z.object({
   scheduleSlotId: z.string().min(1),
   bookingDate: z.string().min(1),
-  paymentMethod: z.enum(["efectivo", "transferencia"]).optional(),
+  useTrialClass: z.enum(["true", "false"]).optional(),
 })
 
 type SessionAlumna =
@@ -114,7 +124,7 @@ export async function loadAgendarDataAction(): Promise<AgendarData> {
       startTime: schema.scheduleSlot.startTime,
       endTime: schema.scheduleSlot.endTime,
       className: schema.scheduleSlot.className,
-      instructor: schema.scheduleSlot.instructor,
+      capacity: schema.scheduleSlot.capacity,
     })
     .from(schema.scheduleSlot)
     .where(eq(schema.scheduleSlot.isActive, true))
@@ -126,7 +136,7 @@ export async function loadAgendarDataAction(): Promise<AgendarData> {
     startTime: row.startTime,
     endTime: row.endTime,
     className: row.className,
-    instructor: row.instructor,
+    capacity: row.capacity,
   }))
 
   const todayStr = localTodayStr()
@@ -143,7 +153,40 @@ export async function loadAgendarDataAction(): Promise<AgendarData> {
     await listDisabledSlotDateKeys(db, rangeStart, rangeEnd),
   )
 
-  return { slots, defaultDate, todayStr, disabledSlotDateKeys }
+  const bookingRows = await db
+    .select({
+      slotId: schema.booking.scheduleSlotId,
+      bookingDate: schema.booking.bookingDate,
+    })
+    .from(schema.booking)
+    .where(
+      and(
+        eq(schema.booking.status, "confirmed"),
+        gte(schema.booking.bookingDate, rangeStart),
+        lte(schema.booking.bookingDate, rangeEnd),
+      ),
+    )
+
+  const bookedBySlotDate: Record<string, number> = {}
+  for (const row of bookingRows) {
+    const d =
+      row.bookingDate instanceof Date
+        ? row.bookingDate
+        : new Date(row.bookingDate as unknown as number)
+    const key = `${row.slotId}|${toLocalDateStr(d)}`
+    bookedBySlotDate[key] = (bookedBySlotDate[key] ?? 0) + 1
+  }
+
+  const individualPlan = await getIndividualClassPlan(db)
+
+  return {
+    slots,
+    defaultDate,
+    todayStr,
+    disabledSlotDateKeys,
+    bookedBySlotDate,
+    individualClassPrice: individualPlan?.priceMxn ?? null,
+  }
 }
 
 export async function loadWeeklyBoardAction() {
@@ -162,7 +205,7 @@ export async function createPublicBookingAction(
   const parsed = publicBookingSchema.safeParse({
     scheduleSlotId: formData.get("scheduleSlotId"),
     bookingDate: formData.get("bookingDate"),
-    paymentMethod: formData.get("paymentMethod") || undefined,
+    useTrialClass: formData.get("useTrialClass") || undefined,
   })
   if (!parsed.success) {
     return { success: false, error: "Revisa la fecha y el horario" }
@@ -170,11 +213,6 @@ export async function createPublicBookingAction(
 
   const db = getDb()
   const alumna = sessionAlumna.alumna
-  const allowNoClasses = parsed.data.paymentMethod === "efectivo"
-  const subCheck = await checkBookableSubscriptionForUser(db, alumna.id)
-  if (!subCheck.ok && !(allowNoClasses && subCheck.reason === "no_classes")) {
-    return { success: false, error: subCheck.message }
-  }
 
   const bookingDate = new Date(`${parsed.data.bookingDate}T12:00:00`)
   const result = await createBookingForUser(db, {
@@ -182,60 +220,83 @@ export async function createPublicBookingAction(
     scheduleSlotId: parsed.data.scheduleSlotId,
     bookingDate,
     birthdate: alumna.birthdate,
-    allowNoClasses,
   })
 
   if (!result.ok) {
     return { success: false, error: result.message }
   }
 
+  // Sin plan que la cubra: o redime su clase muestra, o queda como adeudo.
+  let pendingAmount: number | undefined
+  let trialRedeemed = false
+  if (!result.coveredByPlan) {
+    const [slot] = await db
+      .select({
+        className: schema.scheduleSlot.className,
+        startTime: schema.scheduleSlot.startTime,
+      })
+      .from(schema.scheduleSlot)
+      .where(eq(schema.scheduleSlot.id, parsed.data.scheduleSlotId))
+      .limit(1)
+
+    const className = slot?.className ?? "Clase"
+    const wantsTrial = parsed.data.useTrialClass === "true"
+    const trial = wantsTrial
+      ? await consumeTrialClass(db, {
+          userId: alumna.id,
+          userName: result.userName,
+          className,
+          bookingDate,
+        })
+      : null
+
+    if (trial?.ok === true) {
+      trialRedeemed = true
+    } else {
+      if (trial != null) {
+        console.warn("[agendar] Clase muestra no aplicada, se cobra:", trial.error)
+      }
+      const charge = await chargeIndividualClass(db, {
+        userId: alumna.id,
+        userName: result.userName,
+        className,
+        bookingDate,
+        startTime: slot?.startTime ?? "",
+      })
+      if (charge.ok) {
+        pendingAmount = charge.amount
+      } else {
+        console.error("[agendar] No se pudo registrar el adeudo:", charge.error)
+      }
+    }
+  }
+
   revalidatePath("/dashboard/reservas")
+  revalidatePath("/dashboard/pagos")
 
   return {
     success: true,
     message: `${result.userName}, tu clase quedó confirmada.`,
     bookedDate: parsed.data.bookingDate,
+    pendingAmount,
+    trialRedeemed,
   }
 }
 
-export async function sendBookingPaymentNotificationAction(
-  method: "efectivo" | "transferencia",
-): Promise<{ ok: boolean; error?: string }> {
-  const sessionAlumna = await getSessionAlumna()
-  if (!sessionAlumna.ok) {
-    return { ok: false, error: sessionAlumna.error }
-  }
-
-  const db = getDb()
-  const alumna = sessionAlumna.alumna
-  const subCheck = await checkBookableSubscriptionForUser(db, alumna.id)
-  if (subCheck.ok) {
-    return { ok: false, error: "Aún tienes clases disponibles en tu plan." }
-  }
-  if (subCheck.reason !== "no_classes") {
-    return { ok: false, error: subCheck.message }
-  }
-
-  if (method === "efectivo") {
-    await sendStudioPaymentNotification(db, {
-      userId: alumna.id,
-      nombre: alumna.name,
-    })
-    return { ok: true }
-  }
-
-  await sendTransferPaymentNotification(db, {
-    userId: alumna.id,
-    nombre: alumna.name,
-  })
-
-  return { ok: true }
+export type BookingEligibility = {
+  ok: boolean
+  message?: string
+  alumnaName?: string
+  /** Sin plan que la cubra: la clase se reserva igual y queda como adeudo. */
+  willBeCharged?: { priceMxn: number; planName: string }
+  /** La cuenta aún no redime su clase muestra gratuita. */
+  trialAvailable?: boolean
 }
 
 export async function checkPublicBookingEligibility(
   scheduleSlotId: string,
   bookingDateStr: string,
-): Promise<{ ok: boolean; message?: string; alumnaName?: string; noClasses?: boolean }> {
+): Promise<BookingEligibility> {
   const sessionAlumna = await getSessionAlumna()
   if (!sessionAlumna.ok) {
     return { ok: false, message: sessionAlumna.error }
@@ -302,12 +363,20 @@ export async function checkPublicBookingEligibility(
     return { ok: false, message: timingCheck.message }
   }
 
+  // Sin plan vigente también puede reservar: la clase se le carga a la cuenta
+  // y el estudio regulariza el pago.
   const subCheck = await checkBookableSubscriptionForUser(db, alumna.id)
   if (!subCheck.ok) {
+    const [plan, trialUsed] = await Promise.all([
+      getIndividualClassPlan(db),
+      hasUsedTrialClass(db, alumna.id),
+    ])
     return {
-      ok: false,
-      message: subCheck.message,
-      noClasses: subCheck.reason === "no_classes",
+      ok: true,
+      alumnaName: alumna.name,
+      willBeCharged:
+        plan != null ? { priceMxn: plan.priceMxn, planName: plan.name } : undefined,
+      trialAvailable: !trialUsed,
     }
   }
 

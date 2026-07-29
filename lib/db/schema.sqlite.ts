@@ -15,6 +15,8 @@ export const user = sqliteTable("user", {
   notes: text("notes"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   welcomeShown: integer("welcome_shown", { mode: "boolean" }).notNull().default(false),
+  // Clase muestra: se redime una sola vez por cuenta y no genera cobro.
+  trialClassUsedAt: integer("trial_class_used_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull()
     .$defaultFn(() => new Date()).$onUpdate(() => new Date()),
@@ -203,22 +205,6 @@ export const saleItem = sqliteTable("sale_item", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
 })
 
-export const refund = sqliteTable("refund", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  subscriptionId: text("subscription_id").references(() => subscription.id),
-  classesTotal: integer("classes_total").notNull(),
-  classesUsed: integer("classes_used").notNull(),
-  classesRefunded: integer("classes_refunded").notNull(),
-  costPerClass: real("cost_per_class").notNull(),
-  totalPaid: real("total_paid").notNull(),
-  refundAmount: real("refund_amount").notNull(),
-  reason: text("reason"),
-  refundDate: integer("refund_date", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-  processedBy: text("processed_by").references(() => user.id),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-})
-
 export const coachPayrollPeriod = sqliteTable("coach_payroll_period", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   coachId: text("coach_id").notNull().references(() => user.id),
@@ -325,7 +311,6 @@ export const userRelations = relations(user, ({ many }) => ({
   payments: many(payment),
   notifications: many(notification),
   studioEvents: many(studioEvent, { relationName: "relatedEvents" }),
-  refunds: many(refund),
   sales: many(saleItem),
   payrollPeriods: many(coachPayrollPeriod),
 }))
@@ -362,7 +347,6 @@ export const subscriptionRelations = relations(subscription, ({ one, many }) => 
   user: one(user, { fields: [subscription.userId], references: [user.id] }),
   plan: one(plan, { fields: [subscription.planId], references: [plan.id] }),
   payments: many(payment),
-  refunds: many(refund),
 }))
 
 export const bookingRelations = relations(booking, ({ one }) => ({
@@ -377,12 +361,6 @@ export const paymentRelations = relations(payment, ({ one }) => ({
 
 export const saleItemRelations = relations(saleItem, ({ one }) => ({
   user: one(user, { fields: [saleItem.userId], references: [user.id] }),
-}))
-
-export const refundRelations = relations(refund, ({ one }) => ({
-  user: one(user, { fields: [refund.userId], references: [user.id] }),
-  subscription: one(subscription, { fields: [refund.subscriptionId], references: [subscription.id] }),
-  processor: one(user, { fields: [refund.processedBy], references: [user.id], relationName: "refundProcessor" }),
 }))
 
 export const coachPayrollRelations = relations(coachPayrollPeriod, ({ one }) => ({

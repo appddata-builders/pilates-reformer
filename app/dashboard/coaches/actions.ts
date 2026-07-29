@@ -9,6 +9,8 @@ import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { revokeUserSessions } from "@/lib/revoke-user-sessions"
 import { resetUserPassword } from "@/lib/reset-user-password"
+import { routes } from "@/lib/routes"
+import { changeUserRole } from "@/lib/user-role.server"
 
 export type ActionState = {
   success: boolean
@@ -41,6 +43,7 @@ const updateCoachSchema = z.object({
   email: z.string().email("Correo inválido"),
   phone: z.string().optional(),
   enabled: z.enum(["true", "false"]).optional(),
+  role: z.enum(["alumno", "coach"]).optional(),
 })
 
 export async function createCoachAction(
@@ -103,6 +106,7 @@ export async function updateCoachAction(
     email: formData.get("email"),
     phone: formData.get("phone") ?? undefined,
     enabled: formData.get("enabled") ?? undefined,
+    role: formData.get("role") || undefined,
   })
   if (!parsed.success) {
     return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
@@ -130,6 +134,11 @@ export async function updateCoachAction(
 
   if (existing == null || existing.role !== "coach") {
     return { success: false, error: "Coach no encontrado" }
+  }
+
+  const roleNext = parsed.data.role ?? null
+  if (roleNext != null && roleNext !== existing.role && session.user.id === parsed.data.id) {
+    return { success: false, error: "No puedes cambiar tu propio rol" }
   }
 
   if (parsed.data.email !== existing.email) {
@@ -167,6 +176,19 @@ export async function updateCoachAction(
 
     if (enabledNext === false && existing.enabled !== false) {
       await revokeUserSessions(db, parsed.data.id)
+    }
+
+    // El cambio de rol va al final: libera los horarios donde era instructor
+    // y le asigna folio ST si no tenía.
+    if (roleNext != null && roleNext !== existing.role) {
+      const roleResult = await changeUserRole(db, {
+        userId: parsed.data.id,
+        nextRole: roleNext,
+      })
+      if (!roleResult.ok) {
+        return { success: false, error: roleResult.error }
+      }
+      revalidatePath(routes.usuarios)
     }
 
     revalidatePath("/dashboard/coaches")
@@ -297,10 +319,6 @@ export async function deleteCoachAction(
       .update(schema.saleItem)
       .set({ userId: null })
       .where(eq(schema.saleItem.userId, id))
-    await db
-      .update(schema.refund)
-      .set({ processedBy: null })
-      .where(eq(schema.refund.processedBy, id))
     await db
       .update(schema.studioEvent)
       .set({ createdBy: null })

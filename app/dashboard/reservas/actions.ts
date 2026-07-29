@@ -15,6 +15,7 @@ import {
   checkBookableSubscriptionForUser,
   checkSlotCapacityForBooking,
 } from "@/lib/booking-service"
+import { chargeIndividualClass, getIndividualClassPlan } from "@/lib/class-charge"
 import { validateBookingAgeForSlot } from "@/lib/booking-rules"
 import {
   classEndFromBooking,
@@ -110,11 +111,39 @@ export async function createBookingAction(
       return { success: false, error: result.message }
     }
 
+    let chargeNote = ""
+    if (!result.coveredByPlan) {
+      const [slotInfo] = await db
+        .select({
+          className: schema.scheduleSlot.className,
+          startTime: schema.scheduleSlot.startTime,
+        })
+        .from(schema.scheduleSlot)
+        .where(eq(schema.scheduleSlot.id, parsed.data.scheduleSlotId))
+        .limit(1)
+
+      const charge = await chargeIndividualClass(db, {
+        userId: alumna.id,
+        userName: result.userName,
+        className: slotInfo?.className ?? "Clase",
+        bookingDate,
+        startTime: slotInfo?.startTime ?? "",
+      })
+      if (charge.ok) {
+        chargeNote = ` · Adeudo registrado: ${new Intl.NumberFormat("es-MX", {
+          style: "currency",
+          currency: "MXN",
+          maximumFractionDigits: 0,
+        }).format(charge.amount)}`
+      }
+    }
+
     revalidatePath("/dashboard/reservas")
+    revalidatePath("/dashboard/pagos")
     revalidatePath("/dashboard")
     return {
       success: true,
-      message: `Reserva confirmada para ${result.userName}`,
+      message: `Reserva confirmada para ${result.userName}${chargeNote}`,
       bookedDate: parsed.data.bookingDate,
     }
   } catch {
@@ -126,7 +155,13 @@ export async function checkBookingEligibilityAction(
   displayId: string,
   scheduleSlotId: string,
   bookingDateStr: string,
-): Promise<{ ok: boolean; message?: string; alumnaName?: string }> {
+): Promise<{
+  ok: boolean
+  message?: string
+  alumnaName?: string
+  /** Importe que se cargará por no tener plan vigente. */
+  willBeCharged?: number
+}> {
   const db = getDb()
   const alumna = await findUserByDisplayId(db, displayId)
   if (!alumna) {
@@ -190,9 +225,15 @@ export async function checkBookingEligibilityAction(
     return { ok: false, message: timingCheck.message }
   }
 
+  // Sin plan vigente igual se puede reservar: la clase queda como adeudo.
   const subCheck = await checkBookableSubscriptionForUser(db, alumna.id)
   if (!subCheck.ok) {
-    return { ok: false, message: subCheck.message }
+    const plan = await getIndividualClassPlan(db)
+    return {
+      ok: true,
+      alumnaName: alumna.name,
+      willBeCharged: plan?.priceMxn ?? undefined,
+    }
   }
 
   return { ok: true, alumnaName: alumna.name }

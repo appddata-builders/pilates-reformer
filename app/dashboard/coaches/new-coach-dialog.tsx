@@ -32,7 +32,7 @@ export function NewCoachDialog() {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <UserPlus className="h-4 w-4" />
-          Nuevo Coach
+          Coach
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
