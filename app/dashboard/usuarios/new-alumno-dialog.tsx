@@ -1,7 +1,7 @@
 "use client"
 
 import { useActionState, useEffect, useState } from "react"
-import { Eye, EyeOff, UserPlus } from "lucide-react"
+import { UserPlus } from "lucide-react"
 import { Button } from "@/components/shared/ui/button"
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/shared/ui/input"
 import { Label } from "@/components/shared/ui/label"
 import { DbActionSuccessEffect } from "@/components/features/admin/db-action-feedback"
+import { PasswordInput } from "@/components/features/auth/password-input"
 import { createAlumnoAction, type ActionState } from "./actions"
 import { PlanPickerFields, type PlanOption } from "./plan-picker-fields"
 
@@ -20,7 +21,6 @@ const initial: ActionState = { success: false }
 
 export function NewAlumnoDialog(props: { planes: PlanOption[] }) {
   const [open, setOpen] = useState(false)
-  const [passwordVisible, setPasswordVisible] = useState(false)
   const [state, action, pending] = useActionState(createAlumnoAction, initial)
 
   useEffect(() => {
@@ -58,28 +58,7 @@ export function NewAlumnoDialog(props: { planes: PlanOption[] }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Contraseña temporal</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                name="password"
-                type={passwordVisible ? "text" : "password"}
-                minLength={6}
-                required
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setPasswordVisible(!passwordVisible)}
-                className="absolute right-0 top-0 flex h-full w-10 items-center justify-center text-muted-foreground hover:text-foreground"
-                aria-label={passwordVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
-              >
-                {passwordVisible ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            </div>
+            <PasswordInput id="password" />
             <p className="text-xs text-muted-foreground">
               Cognito le manda un código a su correo; lo escribe la primera vez que entra con esta contraseña.
             </p>

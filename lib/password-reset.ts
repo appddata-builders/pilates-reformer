@@ -1,6 +1,6 @@
 import "server-only"
 
-import { z } from "zod"
+import { passwordSchema } from "@/lib/password-rules"
 import { eq } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
@@ -22,13 +22,8 @@ export const PASSWORD_RESET_GENERIC_MESSAGE =
 export const PASSWORD_RESET_INVALID_CODE_MESSAGE =
   "El código no es válido o ya venció. Solicita uno nuevo."
 
-export const newPasswordSchema = z
-  .string()
-  .min(8, "Contraseña mínimo 8 caracteres")
-  .max(128, "Contraseña demasiado larga")
-  .refine((v) => /[a-zA-Z]/.test(v) && /[0-9]/.test(v), {
-    message: "Usa letras y números",
-  })
+// Mismas reglas que el registro: las de la política de Cognito.
+export const newPasswordSchema = passwordSchema
 
 /** Devuelve null si el correo no es de una cuenta activa. */
 async function resolveResetUser(emailRaw: string) {

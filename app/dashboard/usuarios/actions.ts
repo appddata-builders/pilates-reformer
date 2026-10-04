@@ -17,11 +17,12 @@ import { changeUserRole } from "@/lib/user-role.server"
 import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding"
 import { CognitoPasswordError } from "@/lib/cognito"
 import { createUserAccount, normalizeEmail } from "@/lib/user-accounts"
+import { passwordSchema } from "@/lib/password-rules"
 
 const createAlumnoSchema = z.object({
   name: z.string().min(2, "Nombre demasiado corto"),
   email: z.string().email("Correo inválido"),
-  password: z.string().min(6, "Contraseña mínimo 6 caracteres"),
+  password: passwordSchema,
   phone: z.string().optional(),
   birthdate: z.string().min(1, "Fecha de cumpleaños requerida"),
   planId: z.string().optional(),

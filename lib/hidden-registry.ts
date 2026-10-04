@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { passwordSchema } from "@/lib/password-rules"
 
 export const WELCOME_POLICY_PDF_PATH = "/assets/docs/pilates-reformer-welcome-policy-001.pdf"
 export const WELCOME_POLICY_PDF_FILENAME = "pilates-reformer-welcome-policy-001.pdf"
@@ -55,13 +56,7 @@ export const hiddenRegistrySchema = z.object({
     .max(120, "Nombre demasiado largo")
     .refine((v) => sanitizePersonName(v).length >= 2, "Nombre inválido"),
   email: z.string().email("Correo inválido").max(254),
-  password: z
-    .string()
-    .min(8, "Contraseña mínimo 8 caracteres")
-    .max(128, "Contraseña demasiado larga")
-    .refine((v) => /[a-zA-Z]/.test(v) && /[0-9]/.test(v), {
-      message: "Usa letras y números",
-    }),
+  password: passwordSchema,
   phone: z.string().max(32).optional(),
   birthdate: z.string().max(32).optional(),
   company: z.string().max(200).optional(),

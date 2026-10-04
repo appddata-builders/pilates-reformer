@@ -69,6 +69,10 @@ export async function hiddenRegistryAction(
     return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
   }
 
+  if (formData.get("confirmPassword") !== parsed.data.password) {
+    return { success: false, fieldErrors: { confirmPassword: ["Las contraseñas no coinciden"] } }
+  }
+
   const name = sanitizePersonName(parsed.data.name)
   const email = sanitizeEmail(parsed.data.email)
   const phoneRaw = parsed.data.phone?.trim() ?? ""

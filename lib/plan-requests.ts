@@ -166,16 +166,16 @@ export async function requestPlan(
   if (plan == null) {
     return { ok: false, error: "Ese plan ya no está disponible. Elige otro." }
   }
-  if (state.pendingPlanDebt > 0) {
-    return {
-      ok: false,
-      error: `Debes ${formatMxn(state.pendingPlanDebt)} de tu plan anterior. Págalo en el estudio y después podrás ${params.renewal ? "renovar" : "solicitar otro"}.`,
-    }
-  }
   if (state.current != null) {
     return {
       ok: false,
       error: `Tu ${state.current.planName} sigue vigente hasta el ${formatDay(state.current.endDate)}. Cuando termine podrás renovarlo o elegir otro.`,
+    }
+  }
+  if (state.pendingPlanDebt > 0) {
+    return {
+      ok: false,
+      error: `Debes ${formatMxn(state.pendingPlanDebt)} de tu plan anterior. Págalo en el estudio y después podrás ${params.renewal ? "renovar" : "solicitar otro"}.`,
     }
   }
 

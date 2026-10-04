@@ -10,6 +10,8 @@ import {
   Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle,
 } from "@/components/shared/ui/card"
 import { DashboardBrand } from "@/components/features/admin/dashboard-brand"
+import { PasswordChecklist } from "@/components/features/auth/password-checklist"
+import { isPasswordValid } from "@/lib/password-rules"
 import { routes } from "@/lib/routes"
 import { resetPasswordAction, type ResetPasswordState } from "./actions"
 
@@ -21,6 +23,9 @@ export function ResetPasswordForm(props: {
   email: string
 }) {
   const [passwordVisible, setPasswordVisible] = useState(false)
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const passwordReady = isPasswordValid(password) && password === confirmPassword
   const [state, formAction, pending] = useActionState(resetPasswordAction, initial)
 
   return (
@@ -54,8 +59,8 @@ export function ResetPasswordForm(props: {
             <CardHeader className="space-y-1">
               <CardTitle className="text-xl">Crea tu nueva contraseña</CardTitle>
               <CardDescription>
-                Escribe el código que te llegó de no-reply@verificationemail.com. La
-                contraseña lleva mínimo 8 caracteres, con letras y números.
+                Escribe el código que te llegó de no-reply@verificationemail.com y tu
+                contraseña nueva.
               </CardDescription>
             </CardHeader>
             <form action={formAction} className="flex flex-col gap-6">
@@ -105,8 +110,9 @@ export function ResetPasswordForm(props: {
                       name="password"
                       type={passwordVisible ? "text" : "password"}
                       autoComplete="new-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
-                      minLength={8}
                       maxLength={128}
                       disabled={pending}
                       className="pr-10"
@@ -136,8 +142,9 @@ export function ResetPasswordForm(props: {
                     name="confirmPassword"
                     type={passwordVisible ? "text" : "password"}
                     autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    minLength={8}
                     maxLength={128}
                     disabled={pending}
                   />
@@ -146,10 +153,11 @@ export function ResetPasswordForm(props: {
                       {state.fieldErrors.confirmPassword[0]}
                     </p>
                   ) : null}
+                  <PasswordChecklist password={password} confirm={confirmPassword} />
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-3">
-                <Button className="w-full" type="submit" disabled={pending}>
+                <Button className="w-full" type="submit" disabled={pending || !passwordReady}>
                   {pending ? "Guardando..." : "Cambiar contraseña"}
                 </Button>
                 <p className="text-sm text-center text-muted-foreground">

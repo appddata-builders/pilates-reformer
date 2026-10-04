@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/shared/ui/input"
 import { Label } from "@/components/shared/ui/label"
 import { DbActionSuccessEffect } from "@/components/features/admin/db-action-feedback"
+import { PasswordInput } from "@/components/features/auth/password-input"
 import { createCoachAction, type ActionState } from "./actions"
 
 const initial: ActionState = { success: false }
@@ -56,7 +57,7 @@ export function NewCoachDialog() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="coach-password">Contraseña temporal</Label>
-            <Input id="coach-password" name="password" type="password" required minLength={6} />
+            <PasswordInput id="coach-password" />
             <p className="text-xs text-muted-foreground">
               Cognito le manda un código a su correo; lo escribe la primera vez que entra con esta contraseña.
             </p>

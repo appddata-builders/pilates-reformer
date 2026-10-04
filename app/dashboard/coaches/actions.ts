@@ -12,6 +12,7 @@ import { routes } from "@/lib/routes"
 import { changeUserRole } from "@/lib/user-role.server"
 import { CognitoPasswordError } from "@/lib/cognito"
 import { createUserAccount, normalizeEmail } from "@/lib/user-accounts"
+import { passwordSchema } from "@/lib/password-rules"
 
 const EMAIL_LOCKED_MSG =
   "El correo no se puede cambiar: es la cuenta de acceso en Cognito. Para usar otro, da de alta una cuenta nueva."
@@ -35,7 +36,7 @@ async function assertAdminLike() {
 const createCoachSchema = z.object({
   name: z.string().min(2, "Nombre demasiado corto"),
   email: z.string().email("Correo inválido"),
-  password: z.string().min(6, "Contraseña mínimo 6 caracteres"),
+  password: passwordSchema,
   phone: z.string().optional(),
 })
 

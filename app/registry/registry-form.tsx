@@ -19,7 +19,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/shared/ui/card"
+import { PasswordChecklist } from "@/components/features/auth/password-checklist"
 import { authClient } from "@/lib/auth-client"
+import { isPasswordValid } from "@/lib/password-rules"
 import { routes } from "@/lib/routes"
 import { confirmAccountAndSignIn, resendAccountCode } from "@/lib/sign-in"
 import { hiddenRegistryAction, type RegistryActionState } from "./actions"
@@ -128,10 +130,12 @@ export function RegistryForm(props: { registryToken: string }) {
   const [policyDownloaded, setPolicyDownloaded] = useState(false)
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [state, action, pending] = useActionState(hiddenRegistryAction, initial)
-  // La contraseña sólo vive en memoria para abrir la sesión al confirmar.
-  const [submittedPassword, setSubmittedPassword] = useState("")
+  // La contraseña sólo vive en memoria: con ella se abre la sesión al confirmar.
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
 
   const canSubmit = policyDownloaded && policyAccepted
+  const passwordReady = isPasswordValid(password) && password === confirmPassword
 
   useEffect(() => {
     if (state.success) {
@@ -140,7 +144,7 @@ export function RegistryForm(props: { registryToken: string }) {
   }, [state.success])
 
   if (state.success) {
-    return <RegistryConfirmCard email={state.email ?? ""} password={submittedPassword} />
+    return <RegistryConfirmCard email={state.email ?? ""} password={password} />
   }
 
   return (
@@ -149,14 +153,7 @@ export function RegistryForm(props: { registryToken: string }) {
         <CardTitle className="text-xl">Registro</CardTitle>
         <CardDescription>Completa tus datos para crear tu cuenta</CardDescription>
       </CardHeader>
-      <form
-        action={action}
-        onSubmit={(e) => {
-          const field = e.currentTarget.elements.namedItem("password")
-          setSubmittedPassword(field instanceof HTMLInputElement ? field.value : "")
-        }}
-        className="flex flex-col gap-6"
-      >
+      <form action={action} className="flex flex-col gap-6">
         <input type="hidden" name="registryToken" value={props.registryToken} />
         <input type="hidden" name="policyDownloaded" value={policyDownloaded ? "true" : "false"} />
         <input type="hidden" name="policyAccepted" value={policyAccepted ? "true" : "false"} />
@@ -208,8 +205,9 @@ export function RegistryForm(props: { registryToken: string }) {
                 id="password"
                 name="password"
                 type={passwordVisible ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
                 maxLength={128}
                 autoComplete="new-password"
                 className="pr-10"
@@ -230,6 +228,23 @@ export function RegistryForm(props: { registryToken: string }) {
             {state.fieldErrors?.password ? (
               <p className="text-destructive text-sm">{state.fieldErrors.password[0]}</p>
             ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type={passwordVisible ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              maxLength={128}
+              autoComplete="new-password"
+            />
+            {state.fieldErrors?.confirmPassword ? (
+              <p className="text-destructive text-sm">{state.fieldErrors.confirmPassword[0]}</p>
+            ) : null}
+            <PasswordChecklist password={password} confirm={confirmPassword} />
           </div>
           <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
             <p className="text-sm font-medium">Acuerdo y políticas</p>
@@ -293,7 +308,7 @@ export function RegistryForm(props: { registryToken: string }) {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Button className="w-full" type="submit" disabled={pending || !canSubmit}>
+          <Button className="w-full" type="submit" disabled={pending || !canSubmit || !passwordReady}>
             {pending ? "Registrando..." : "Crear cuenta"}
           </Button>
           <p className="text-xs text-center text-muted-foreground">
