@@ -19,16 +19,117 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/shared/ui/card"
+import { authClient } from "@/lib/auth-client"
 import { routes } from "@/lib/routes"
+import { confirmAccountAndSignIn, resendAccountCode } from "@/lib/sign-in"
 import { hiddenRegistryAction, type RegistryActionState } from "./actions"
 
 const initial: RegistryActionState = { success: false }
+
+/**
+ * Después del alta, como en refautomex: Cognito mandó un código al correo y
+ * aquí se confirma. Con la contraseña recién escrita se abre la sesión y entra
+ * directo al panel. Si se cierra esta pantalla, el login pide el código.
+ */
+function RegistryConfirmCard(props: { email: string; password: string }) {
+  const [code, setCode] = useState("")
+  const [pending, setPending] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [infoMsg, setInfoMsg] = useState<string | null>(null)
+
+  async function handleConfirm(e: React.FormEvent) {
+    e.preventDefault()
+    setErrorMsg(null)
+    setInfoMsg(null)
+    setPending(true)
+
+    const signIn = await confirmAccountAndSignIn(props.email, props.password, code)
+    if (!signIn.ok) {
+      setPending(false)
+      setErrorMsg(signIn.error)
+      return
+    }
+
+    const user = await authClient.waitForSessionUser()
+    if (user == null) {
+      setPending(false)
+      setErrorMsg("Tu cuenta quedó confirmada. Entra con tu correo y contraseña.")
+      return
+    }
+    window.location.assign(routes.dashboard)
+  }
+
+  async function handleResend() {
+    setResending(true)
+    const res = await resendAccountCode(props.email)
+    setResending(false)
+    setInfoMsg(res.message)
+  }
+
+  return (
+    <Card className="w-full max-w-md border shadow-sm">
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-xl">Confirma tu correo</CardTitle>
+        <CardDescription>
+          Te mandamos un código a {props.email} desde no-reply@verificationemail.com
+        </CardDescription>
+      </CardHeader>
+      <form onSubmit={handleConfirm} className="flex flex-col gap-6">
+        <CardContent className="space-y-4">
+          {errorMsg ? <p className="text-sm text-destructive">{errorMsg}</p> : null}
+          {infoMsg ? <p className="text-sm text-muted-foreground">{infoMsg}</p> : null}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="code">Código de confirmación</Label>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={pending || resending}
+                className="text-xs text-primary hover:underline disabled:opacity-50"
+              >
+                {resending ? "Reenviando..." : "Reenviar código"}
+              </button>
+            </div>
+            <Input
+              id="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="123456"
+              required
+              maxLength={10}
+              disabled={pending}
+              className="font-mono tracking-widest"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Revisa también la carpeta de spam. Tu plan lo confirma el estudio.
+          </p>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-3">
+          <Button className="w-full" type="submit" disabled={pending}>
+            {pending ? "Confirmando..." : "Confirmar y entrar"}
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            <Link href={routes.login} className="text-primary hover:underline">
+              Confirmar después desde iniciar sesión
+            </Link>
+          </p>
+        </CardFooter>
+      </form>
+    </Card>
+  )
+}
 
 export function RegistryForm(props: { registryToken: string }) {
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [policyDownloaded, setPolicyDownloaded] = useState(false)
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [state, action, pending] = useActionState(hiddenRegistryAction, initial)
+  // La contraseña sólo vive en memoria para abrir la sesión al confirmar.
+  const [submittedPassword, setSubmittedPassword] = useState("")
 
   const canSubmit = policyDownloaded && policyAccepted
 
@@ -39,29 +140,7 @@ export function RegistryForm(props: { registryToken: string }) {
   }, [state.success])
 
   if (state.success) {
-    return (
-      <Card className="w-full max-w-md border shadow-sm">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-xl">Cuenta creada</CardTitle>
-          <CardDescription>Revisa tu correo</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground text-center">
-            Te mandamos un código desde no-reply@verificationemail.com. La primera vez que
-            entres con tu correo y contraseña te lo vamos a pedir. Tu plan lo confirma el
-            estudio.
-          </p>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2">
-          <Button asChild className="w-full">
-            <a href={routes.agendar}>Ir a agenda</a>
-          </Button>
-          <Button asChild variant="outline" className="w-full">
-            <Link href={routes.login}>Iniciar sesión</Link>
-          </Button>
-        </CardFooter>
-      </Card>
-    )
+    return <RegistryConfirmCard email={state.email ?? ""} password={submittedPassword} />
   }
 
   return (
@@ -70,7 +149,14 @@ export function RegistryForm(props: { registryToken: string }) {
         <CardTitle className="text-xl">Registro</CardTitle>
         <CardDescription>Completa tus datos para crear tu cuenta</CardDescription>
       </CardHeader>
-      <form action={action} className="flex flex-col gap-6">
+      <form
+        action={action}
+        onSubmit={(e) => {
+          const field = e.currentTarget.elements.namedItem("password")
+          setSubmittedPassword(field instanceof HTMLInputElement ? field.value : "")
+        }}
+        className="flex flex-col gap-6"
+      >
         <input type="hidden" name="registryToken" value={props.registryToken} />
         <input type="hidden" name="policyDownloaded" value={policyDownloaded ? "true" : "false"} />
         <input type="hidden" name="policyAccepted" value={policyAccepted ? "true" : "false"} />

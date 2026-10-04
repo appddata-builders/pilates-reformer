@@ -24,6 +24,8 @@ export type RegistryActionState = {
   success: boolean
   error?: string
   fieldErrors?: Record<string, string[]>
+  /** Correo de la cuenta creada, para pedir el código de confirmación. */
+  email?: string
 }
 
 function getRegistryTokenFromForm(formData: FormData): string | undefined {
@@ -133,7 +135,7 @@ export async function hiddenRegistryAction(
       estudio: policy?.studioName ?? "Pilates Studio",
     })
 
-    return { success: true }
+    return { success: true, email }
   } catch (e) {
     if (e instanceof EmailTakenError) {
       return {

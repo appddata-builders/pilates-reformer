@@ -71,6 +71,20 @@ async function getSession(): Promise<{ data: SessionData }> {
   return { data: await loadSession() }
 }
 
+/**
+ * Después de iniciar sesión con una server action la cookie ya viene en la
+ * respuesta, pero se espera a que /api/auth/session la confirme antes de ir
+ * al panel. Null si no aparece en ~6 s.
+ */
+async function waitForSessionUser(): Promise<ClientSessionUser | null> {
+  for (let i = 0; i < 40; i++) {
+    const s = await getSession()
+    if (s.data?.user != null) return s.data.user
+    await new Promise<void>((resolve) => { window.setTimeout(resolve, 150) })
+  }
+  return null
+}
+
 async function signOut(): Promise<{ error: Error | null }> {
   try {
     const res = await fetch("/api/auth/sign-out", { method: "POST", credentials: "same-origin" })
@@ -82,4 +96,4 @@ async function signOut(): Promise<{ error: Error | null }> {
   }
 }
 
-export const authClient = { useSession, getSession, signOut }
+export const authClient = { useSession, getSession, signOut, waitForSessionUser }

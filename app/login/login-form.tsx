@@ -18,15 +18,6 @@ import { routes } from "@/lib/routes"
 const CONNECTION_ERROR_MSG = "Problemas de conexión. Vuelva a intentar más tarde."
 const DISABLED_MSG = "Tu cuenta está inhabilitada. Contacta al estudio."
 
-async function waitForSessionUser() {
-  for (let i = 0; i < 40; i++) {
-    const s = await authClient.getSession()
-    if (s.data?.user != null) return s.data.user
-    await new Promise<void>((resolve) => { window.setTimeout(resolve, 150) })
-  }
-  return null
-}
-
 export function LoginForm(props: {
   studioName: string
   logoUrl: string | null
@@ -80,7 +71,7 @@ export function LoginForm(props: {
       return
     }
 
-    const user = await waitForSessionUser()
+    const user = await authClient.waitForSessionUser()
     if (user == null) {
       setOverlayActive(false)
       setErrorMsg(CONNECTION_ERROR_MSG)
