@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import {
+  confirmCognitoSignUp,
+  resendCognitoConfirmation,
   signInWithPassword,
   verifyCognitoIdToken,
   type CognitoSignInFailure,
@@ -13,16 +15,16 @@ import { normalizeEmail } from "@/lib/user-accounts"
 
 export type SignInResult =
   | { ok: true }
-  | { ok: false; error: string }
+  | { ok: false; error: string; needsConfirmation?: boolean }
 
 const INVALID_CREDENTIALS_MSG = "Correo o contraseña incorrectos"
 
 const COGNITO_FAILURE_MSG: Record<CognitoSignInFailure, string> = {
   credentials: INVALID_CREDENTIALS_MSG,
   disabled: ACCOUNT_DISABLED_MESSAGE,
-  unconfirmed: "Tu cuenta aún no está confirmada. Contacta al estudio.",
+  unconfirmed: "Confirma tu correo: escribe el código que te mandamos de no-reply@verificationemail.com.",
   reset_required: "Necesitas crear una nueva contraseña. Usa “¿Olvidaste tu contraseña?”.",
-  temporary_password: "Tu contraseña es temporal. Pide al estudio que te la restablezca.",
+  temporary_password: "Tu contraseña es temporal. Contacta al estudio.",
   too_many_attempts: "Demasiados intentos. Espera unos minutos y vuelve a intentar.",
   unavailable: "Problemas de conexión. Vuelva a intentar más tarde.",
 }
@@ -56,7 +58,11 @@ export async function signInWithEmail(emailRaw: string, password: string): Promi
 
   const cognito = await signInWithPassword(email, password)
   if (!cognito.ok) {
-    return { ok: false, error: COGNITO_FAILURE_MSG[cognito.reason] }
+    return {
+      ok: false,
+      error: COGNITO_FAILURE_MSG[cognito.reason],
+      ...(cognito.reason === "unconfirmed" ? { needsConfirmation: true } : {}),
+    }
   }
 
   let payload: Awaited<ReturnType<typeof verifyCognitoIdToken>>
@@ -78,4 +84,47 @@ export async function signInWithEmail(emailRaw: string, password: string): Promi
 
   await startSession(cognito)
   return { ok: true }
+}
+
+const CONFIRM_FAILURE_MSG = {
+  code: "El código no es válido o ya venció. Pide uno nuevo.",
+  too_many_attempts: "Demasiados intentos. Espera unos minutos y vuelve a intentar.",
+  unavailable: "Problemas de conexión. Vuelva a intentar más tarde.",
+} as const
+
+/**
+ * Primera entrada de una cuenta nueva: confirma el correo con el código que
+ * mandó Cognito al darla de alta y luego entra normal.
+ */
+export async function confirmAccountAndSignIn(
+  emailRaw: string,
+  password: string,
+  codeRaw: string,
+): Promise<SignInResult> {
+  const email = normalizeEmail(emailRaw)
+  const code = codeRaw.replace(/\s+/g, "")
+  if (code === "") {
+    return { ok: false, error: "Escribe el código que te llegó por correo", needsConfirmation: true }
+  }
+
+  const confirmed = await confirmCognitoSignUp(email, code)
+  if (!confirmed.ok) {
+    return { ok: false, error: CONFIRM_FAILURE_MSG[confirmed.reason], needsConfirmation: true }
+  }
+  return signInWithEmail(email, password)
+}
+
+/** No revela si la cuenta existe: la respuesta es la misma. */
+export async function resendAccountCode(emailRaw: string): Promise<{ message: string }> {
+  const email = normalizeEmail(emailRaw)
+  const [user] = await getDb()
+    .select({ enabled: schema.user.enabled })
+    .from(schema.user)
+    .where(eq(schema.user.email, email))
+    .limit(1)
+
+  if (user != null && user.enabled !== false) {
+    await resendCognitoConfirmation(email)
+  }
+  return { message: "Si la cuenta existe y falta confirmarla, te reenviamos el código." }
 }

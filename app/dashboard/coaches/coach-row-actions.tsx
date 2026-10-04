@@ -175,8 +175,12 @@ export function CoachRowActions(props: { coach: CoachRowData }) {
                 name="email"
                 type="email"
                 required
+                readOnly
                 defaultValue={props.coach.email}
               />
+              <p className="text-xs text-muted-foreground">
+                Es su cuenta de acceso en Cognito; no se puede cambiar.
+              </p>
               {editState.fieldErrors?.email ? (
                 <p className="text-destructive text-sm">{editState.fieldErrors.email[0]}</p>
               ) : null}
@@ -239,7 +243,8 @@ export function CoachRowActions(props: { coach: CoachRowData }) {
             <AlertDialogTitle>¿Borrar este coach?</AlertDialogTitle>
             <AlertDialogDescription>
               Se eliminará la cuenta de {props.coach.name} ({props.coach.email}). Las clases
-              asignadas quedarán sin instructor.
+              asignadas quedarán sin instructor. Su cuenta de Cognito se queda: para reusar
+              ese correo hay que borrarla en la consola de Cognito.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteState.error ? (

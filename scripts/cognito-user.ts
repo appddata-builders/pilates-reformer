@@ -8,8 +8,9 @@
  *     --email root@estudio.mx --password 'xxxxxx' --name "Root" --role root
  *
  * Necesita la base (DATABASE_URL, o DB_DRIVER=sqlite para local.db),
- * NEXT_PUBLIC_USER_POOL_ID, NEXT_PUBLIC_CLIENT_ID y credenciales IAM
- * (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
+ * NEXT_PUBLIC_USER_POOL_ID, NEXT_PUBLIC_CLIENT_ID y COGNITO_CLIENT_SECRET.
+ * La cuenta queda sin confirmar: Cognito manda un código al correo y se
+ * escribe en /login la primera vez que se entra.
  */
 
 import { parseArgs } from "node:util"
@@ -49,6 +50,7 @@ async function main() {
     role,
   })
   console.log(`>> Cuenta creada: ${email} (${role}) id=${id}`)
+  console.log(">> Revisa el correo: el código de confirmación se escribe en /login al entrar.")
 }
 
 main()

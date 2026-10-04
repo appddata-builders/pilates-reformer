@@ -1,17 +1,13 @@
 import { createHmac } from "node:crypto"
 import {
-  AdminCreateUserCommand,
-  AdminDeleteUserCommand,
-  AdminGetUserCommand,
-  AdminSetUserPasswordCommand,
-  AdminUpdateUserAttributesCommand,
-  AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
   ConfirmForgotPasswordCommand,
+  ConfirmSignUpCommand,
   ForgotPasswordCommand,
   InitiateAuthCommand,
+  ResendConfirmationCodeCommand,
   RevokeTokenCommand,
-  type AttributeType,
+  SignUpCommand,
   type InitiateAuthCommandOutput,
 } from "@aws-sdk/client-cognito-identity-provider"
 import { CognitoJwtVerifier } from "aws-jwt-verify"
@@ -20,13 +16,13 @@ import { CognitoJwtVerifier } from "aws-jwt-verify"
  * Cognito guarda las contraseñas y es la identidad (correo + `sub`); la base
  * guarda todo lo demás (rol, enabled, planes). Es el mismo esquema de
  * refautomex -un user pool por app, el usuario ligado por su `sub`, el ID
- * token verificado con aws-jwt-verify- con dos diferencias:
+ * token verificado con aws-jwt-verify- y, como allá, sólo con las APIs
+ * públicas del user pool: SignUp, ConfirmSignUp, login, ForgotPassword. No hay
+ * credenciales IAM, así que nadie toca la cuenta de otra persona en Cognito:
+ * cada quien confirma su correo y cambia su contraseña con un código.
  *
- * - El app client tiene secret, así que todo corre en el servidor: el
- *   navegador no puede calcular SECRET_HASH sin exponer el secret.
- * - El estudio da de alta cuentas, restablece contraseñas y elimina usuarios.
- *   Eso sólo se puede con las APIs Admin*, que firman con las credenciales
- *   IAM del entorno (AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY).
+ * La diferencia con refautomex: el app client tiene secret, así que todo corre
+ * en el servidor; el navegador no puede calcular SECRET_HASH sin exponerlo.
  */
 
 // Con índice y no con `process.env.NEXT_PUBLIC_...`: Next congela esas
@@ -85,8 +81,8 @@ function isSecretHashError(e: unknown): boolean {
 // --------------------------------------------------------------- errores ---
 
 export class EmailTakenError extends Error {
-  constructor() {
-    super("El correo ya está registrado")
+  constructor(message = "El correo ya está registrado") {
+    super(message)
     this.name = "EmailTakenError"
   }
 }
@@ -108,20 +104,6 @@ function passwordPolicyMessage(raw: string): string {
   if (text.includes("numeric")) return "La contraseña debe incluir números"
   if (text.includes("symbol")) return "La contraseña debe incluir símbolos"
   return "La contraseña no cumple la política de seguridad"
-}
-
-function toAdminError(e: unknown, action: string): Error {
-  switch (errorName(e)) {
-    case "InvalidPasswordException":
-      return new CognitoPasswordError(passwordPolicyMessage(errorMessage(e)))
-    case "UsernameExistsException":
-    case "AliasExistsException":
-      return new EmailTakenError()
-    case "UserNotFoundException":
-      return new Error("Este usuario no tiene cuenta de acceso en Cognito")
-  }
-  console.error(`[cognito] No se pudo ${action}:`, e)
-  return new Error(`No se pudo ${action} en Cognito. Intenta de nuevo en unos minutos.`)
 }
 
 // ----------------------------------------------------------------- login ---
@@ -184,8 +166,7 @@ export async function signInWithPassword(
     if (idToken) {
       return { ok: true, idToken, refreshToken: out.AuthenticationResult?.RefreshToken ?? null }
     }
-    // Cuenta creada desde la consola con contraseña temporal. Cognito no deja
-    // usar "olvidé mi contraseña" en ese estado; el reset del estudio sí.
+    // Cuenta creada a mano en la consola de Cognito con contraseña temporal.
     if (out.ChallengeName === "NEW_PASSWORD_REQUIRED") {
       return { ok: false, reason: "temporary_password" }
     }
@@ -260,30 +241,18 @@ export async function revokeRefreshToken(refreshToken: string): Promise<void> {
   }
 }
 
-/**
- * Revoca todos los refresh tokens de la cuenta. Los ID tokens vigentes los
- * corta `sessions_revoked_at` (lib/revoke-user-sessions.ts).
- */
-export async function signOutCognitoUserEverywhere(username: string): Promise<void> {
-  try {
-    await getClient().send(
-      new AdminUserGlobalSignOutCommand({ UserPoolId: getConfig().userPoolId, Username: username }),
-    )
-  } catch (e) {
-    if (errorName(e) === "UserNotFoundException") return
-    console.error("[cognito] No se pudo cerrar la sesión en todos los dispositivos:", e)
-  }
-}
-
 // --------------------------------------------------- olvidé mi contraseña ---
+
+export type PasswordResetCodeResult =
+  | { ok: true }
+  | { ok: false; reason: "unconfirmed" | "not_found" | "too_many_attempts" | "unavailable" }
 
 /**
  * Cognito manda el código por correo desde su remitente por defecto
  * (no-reply@verificationemail.com); el texto se edita en la consola, en
- * "Message templates". No falla: quien lo pide siempre ve el mismo mensaje,
- * exista o no la cuenta.
+ * "Message templates". Sólo llega a cuentas con el correo ya confirmado.
  */
-export async function sendPasswordResetCode(email: string): Promise<void> {
+export async function sendPasswordResetCode(email: string): Promise<PasswordResetCodeResult> {
   try {
     await getClient().send(
       new ForgotPasswordCommand({
@@ -292,8 +261,21 @@ export async function sendPasswordResetCode(email: string): Promise<void> {
         SecretHash: secretHash(email).SECRET_HASH,
       }),
     )
+    return { ok: true }
   } catch (e) {
+    switch (isSecretHashError(e) ? "" : errorName(e)) {
+      case "UserNotFoundException":
+        return { ok: false, reason: "not_found" }
+      // Sin correo confirmado o con contraseña temporal de la consola.
+      case "InvalidParameterException":
+      case "NotAuthorizedException":
+        return { ok: false, reason: "unconfirmed" }
+      case "LimitExceededException":
+      case "TooManyRequestsException":
+        return { ok: false, reason: "too_many_attempts" }
+    }
     console.error("[cognito] No se pudo enviar el código de recuperación:", e)
+    return { ok: false, reason: "unavailable" }
   }
 }
 
@@ -354,109 +336,95 @@ export async function verifyCognitoIdToken(token: string) {
   return verifier.verify(token)
 }
 
-// ----------------------------------------------------------------- admin ---
-
-function subFromAttributes(attributes: AttributeType[] | undefined): string | null {
-  return attributes?.find((a) => a.Name === "sub")?.Value ?? null
-}
+// ----------------------------------------------------------------- altas ---
 
 /**
- * `username` puede ser el correo o el `sub`: las APIs Admin* aceptan
- * cualquiera de los dos. Devuelve null si la cuenta no existe.
+ * Crea la cuenta como en el sign-up de refautomex: queda sin confirmar y
+ * Cognito manda un código al correo, que la persona escribe la primera vez que
+ * entra. Devuelve el `sub` (UserSub) para guardarlo en `user.cognito_id`.
  */
-export async function findCognitoSub(username: string): Promise<string | null> {
-  try {
-    const out = await getClient().send(
-      new AdminGetUserCommand({ UserPoolId: getConfig().userPoolId, Username: username }),
-    )
-    return subFromAttributes(out.UserAttributes)
-  } catch (e) {
-    if (errorName(e) === "UserNotFoundException") return null
-    throw toAdminError(e, "consultar la cuenta")
-  }
-}
-
-/** Crea la cuenta sin contraseña utilizable; falta `setCognitoPassword`. */
-export async function createCognitoUser(params: {
+export async function signUpCognitoUser(params: {
   email: string
-  name: string
-}): Promise<string> {
+  password: string
+}): Promise<{ sub: string; confirmed: boolean }> {
   try {
     const out = await getClient().send(
-      new AdminCreateUserCommand({
-        UserPoolId: getConfig().userPoolId,
+      new SignUpCommand({
+        ClientId: getConfig().clientId,
         Username: params.email,
-        UserAttributes: [
-          { Name: "email", Value: params.email },
-          { Name: "email_verified", Value: "true" },
-          { Name: "name", Value: params.name },
-        ],
-        // La contraseña la comparte el estudio o la escoge quien se registra:
-        // Cognito no debe mandar su propio correo con una temporal.
-        MessageAction: "SUPPRESS",
+        Password: params.password,
+        SecretHash: secretHash(params.email).SECRET_HASH,
+        UserAttributes: [{ Name: "email", Value: params.email }],
       }),
     )
-    const sub = subFromAttributes(out.User?.Attributes)
-    if (sub == null) throw new Error("Cognito no devolvió el sub de la cuenta nueva")
-    return sub
+    if (!out.UserSub) throw new Error("Cognito no devolvió el sub de la cuenta nueva")
+    return { sub: out.UserSub, confirmed: out.UserConfirmed === true }
   } catch (e) {
-    throw toAdminError(e, "crear la cuenta")
+    switch (isSecretHashError(e) ? "" : errorName(e)) {
+      case "InvalidPasswordException":
+        throw new CognitoPasswordError(passwordPolicyMessage(errorMessage(e)))
+      // Sin APIs de admin no hay forma de reusar una cuenta que ya existe en
+      // Cognito (p. ej. de un usuario borrado del panel): hay que quitarla en
+      // la consola.
+      case "UsernameExistsException":
+      case "AliasExistsException":
+        throw new EmailTakenError(
+          "Ese correo ya tiene una cuenta en Cognito. Bórrala en la consola de Cognito o usa otro correo.",
+        )
+    }
+    console.error("[cognito] No se pudo crear la cuenta:", e)
+    throw new Error("No se pudo crear la cuenta. Intenta de nuevo en unos minutos.")
   }
 }
 
-export async function updateCognitoUser(
-  username: string,
-  attributes: { email?: string; name?: string },
-): Promise<void> {
-  const list: AttributeType[] = []
-  if (attributes.email != null) {
-    list.push({ Name: "email", Value: attributes.email })
-    // Sin esto Cognito deja el correo anterior activo hasta que se verifique.
-    list.push({ Name: "email_verified", Value: "true" })
-  }
-  if (attributes.name != null) list.push({ Name: "name", Value: attributes.name })
-  if (list.length === 0) return
+export type ConfirmSignUpResult =
+  | { ok: true }
+  | { ok: false; reason: "code" | "too_many_attempts" | "unavailable" }
 
+export async function confirmCognitoSignUp(email: string, code: string): Promise<ConfirmSignUpResult> {
   try {
     await getClient().send(
-      new AdminUpdateUserAttributesCommand({
-        UserPoolId: getConfig().userPoolId,
-        Username: username,
-        UserAttributes: list,
+      new ConfirmSignUpCommand({
+        ClientId: getConfig().clientId,
+        Username: email,
+        ConfirmationCode: code,
+        SecretHash: secretHash(email).SECRET_HASH,
       }),
     )
+    return { ok: true }
   } catch (e) {
-    throw toAdminError(e, "actualizar la cuenta")
+    switch (isSecretHashError(e) ? "" : errorName(e)) {
+      case "NotAuthorizedException":
+        // "Current status is CONFIRMED": ya estaba confirmada, p. ej. en otra pestaña.
+        if (/confirmed/i.test(errorMessage(e))) return { ok: true }
+        return { ok: false, reason: "code" }
+      case "CodeMismatchException":
+      case "ExpiredCodeException":
+      case "UserNotFoundException":
+        return { ok: false, reason: "code" }
+      case "LimitExceededException":
+      case "TooManyFailedAttemptsException":
+      case "TooManyRequestsException":
+        return { ok: false, reason: "too_many_attempts" }
+    }
+    console.error("[cognito] No se pudo confirmar la cuenta:", e)
+    return { ok: false, reason: "unavailable" }
   }
 }
 
-/** Contraseña permanente: la cuenta queda confirmada y sin reto al entrar. */
-export async function setCognitoPassword(username: string, password: string): Promise<void> {
+/** Reenvía el código de confirmación del correo. */
+export async function resendCognitoConfirmation(email: string): Promise<boolean> {
   try {
     await getClient().send(
-      new AdminSetUserPasswordCommand({
-        UserPoolId: getConfig().userPoolId,
-        Username: username,
-        Password: password,
-        Permanent: true,
+      new ResendConfirmationCodeCommand({
+        ClientId: getConfig().clientId,
+        Username: email,
+        SecretHash: secretHash(email).SECRET_HASH,
       }),
     )
+    return true
   } catch (e) {
-    throw toAdminError(e, "guardar la contraseña")
-  }
-}
-
-/**
- * No falla: el usuario ya se borró de la base, y si la cuenta queda huérfana
- * en Cognito el siguiente alta con ese correo la reutiliza.
- */
-export async function deleteCognitoUser(username: string): Promise<void> {
-  try {
-    await getClient().send(
-      new AdminDeleteUserCommand({ UserPoolId: getConfig().userPoolId, Username: username }),
-    )
-  } catch (e) {
-    if (errorName(e) === "UserNotFoundException") return
-    console.error("[cognito] No se pudo eliminar la cuenta:", e)
+    console.error("[cognito] No se pudo reenviar el código de confirmación:", e)
+    return false
   }
 }

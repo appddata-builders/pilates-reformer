@@ -12,7 +12,7 @@ import {
 import { LoginLoadingOverlay } from "@/components/features/login/login-loading-overlay"
 import { DashboardBrand } from "@/components/features/admin/dashboard-brand"
 import { authClient } from "@/lib/auth-client"
-import { signInWithEmail } from "@/lib/sign-in"
+import { confirmAccountAndSignIn, resendAccountCode, signInWithEmail } from "@/lib/sign-in"
 import { routes } from "@/lib/routes"
 
 const CONNECTION_ERROR_MSG = "Problemas de conexión. Vuelva a intentar más tarde."
@@ -37,6 +37,18 @@ export function LoginForm(props: {
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [overlayActive, setOverlayActive] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(props.initialError)
+  // Cuenta nueva sin confirmar: Cognito pide el código que mandó al correo.
+  const [needsCode, setNeedsCode] = useState(false)
+  const [code, setCode] = useState("")
+  const [infoMsg, setInfoMsg] = useState<string | null>(null)
+  const [resending, setResending] = useState(false)
+
+  async function handleResendCode() {
+    setResending(true)
+    const res = await resendAccountCode(email)
+    setResending(false)
+    setInfoMsg(res.message)
+  }
 
   const handleConnectionTimeout = useCallback(async function handleConnectionTimeout() {
     const s = await authClient.getSession()
@@ -55,12 +67,16 @@ export function LoginForm(props: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErrorMsg(null)
+    setInfoMsg(null)
     setOverlayActive(true)
 
-    const signIn = await signInWithEmail(email, password)
+    const signIn = needsCode
+      ? await confirmAccountAndSignIn(email, password, code)
+      : await signInWithEmail(email, password)
     if (!signIn.ok) {
       setOverlayActive(false)
       setErrorMsg(signIn.error)
+      setNeedsCode(signIn.needsConfirmation === true)
       return
     }
 
@@ -102,6 +118,7 @@ export function LoginForm(props: {
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <CardContent className="space-y-4">
               {errorMsg ? <p className="text-sm text-destructive">{errorMsg}</p> : null}
+              {infoMsg ? <p className="text-sm text-muted-foreground">{infoMsg}</p> : null}
               <div className="space-y-2">
                 <Label htmlFor="email">Correo</Label>
                 <Input
@@ -109,7 +126,10 @@ export function LoginForm(props: {
                   type="email"
                   autoComplete="username"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setNeedsCode(false)
+                  }}
                   placeholder="correo@ejemplo.com"
                   required
                   disabled={overlayActive}
@@ -151,10 +171,37 @@ export function LoginForm(props: {
                   </button>
                 </div>
               </div>
+              {needsCode ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="code">Código de confirmación</Label>
+                    <button
+                      type="button"
+                      onClick={handleResendCode}
+                      disabled={overlayActive || resending}
+                      className="text-xs text-primary hover:underline disabled:opacity-50"
+                    >
+                      {resending ? "Reenviando..." : "Reenviar código"}
+                    </button>
+                  </div>
+                  <Input
+                    id="code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="123456"
+                    required
+                    maxLength={10}
+                    disabled={overlayActive}
+                    className="font-mono tracking-widest"
+                  />
+                </div>
+              ) : null}
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
               <Button className="w-full" type="submit" disabled={overlayActive}>
-                {overlayActive ? "Ingresando..." : "Continuar"}
+                {overlayActive ? "Ingresando..." : needsCode ? "Confirmar y entrar" : "Continuar"}
               </Button>
               <p className="text-sm text-center text-muted-foreground">
                 ¿No tienes cuenta?{" "}

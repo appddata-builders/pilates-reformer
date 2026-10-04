@@ -57,6 +57,9 @@ export function NewCoachDialog() {
           <div className="space-y-2">
             <Label htmlFor="coach-password">Contraseña temporal</Label>
             <Input id="coach-password" name="password" type="password" required minLength={6} />
+            <p className="text-xs text-muted-foreground">
+              Cognito le manda un código a su correo; lo escribe la primera vez que entra con esta contraseña.
+            </p>
             {state.fieldErrors?.password ? (
               <p className="text-destructive text-sm">{state.fieldErrors.password[0]}</p>
             ) : null}

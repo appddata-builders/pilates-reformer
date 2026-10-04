@@ -80,6 +80,9 @@ export function NewAlumnoDialog(props: { planes: PlanOption[] }) {
                 )}
               </button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Cognito le manda un código a su correo; lo escribe la primera vez que entra con esta contraseña.
+            </p>
             {state.fieldErrors?.password ? (
               <p className="text-destructive text-sm">{state.fieldErrors.password[0]}</p>
             ) : null}
@@ -101,11 +104,6 @@ export function NewAlumnoDialog(props: { planes: PlanOption[] }) {
             showStartDate
           />
           {state.error ? <p className="text-destructive text-sm">{state.error}</p> : null}
-          {state.success ? (
-            <p className="text-sm text-green-700">
-              Usuario creado. Entra con su correo y la contraseña temporal.
-            </p>
-          ) : null}
           <Button type="submit" className="w-full" disabled={pending}>
             Registrar usuario
           </Button>

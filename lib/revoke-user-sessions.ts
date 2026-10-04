@@ -1,26 +1,16 @@
 import type { AnyDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
-import { signOutCognitoUserEverywhere } from "@/lib/cognito"
 
 /**
  * Cierra todas las sesiones del usuario al instante: lib/session.ts rechaza
- * los ID tokens emitidos antes de `sessions_revoked_at`, y Cognito revoca los
- * refresh tokens para que no se puedan renovar.
+ * los ID tokens con `auth_time` anterior a `sessions_revoked_at`. Renovar el
+ * token no lo salva, porque Cognito conserva el `auth_time` original; para
+ * volver a entrar hay que escribir la contraseña.
  */
 export async function revokeUserSessions(db: AnyDb, userId: string) {
-  const [row] = await db
-    .select({ cognitoId: schema.user.cognitoId })
-    .from(schema.user)
-    .where(eq(schema.user.id, userId))
-    .limit(1)
-
   await db
     .update(schema.user)
     .set({ sessionsRevokedAt: new Date() })
     .where(eq(schema.user.id, userId))
-
-  if (row != null) {
-    await signOutCognitoUserEverywhere(row.cognitoId)
-  }
 }

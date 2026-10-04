@@ -7,17 +7,21 @@ import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { revokeUserSessions } from "@/lib/revoke-user-sessions"
-import { resetUserPassword } from "@/lib/reset-user-password"
+import { sendStudioPasswordReset } from "@/lib/reset-user-password"
 import { routes } from "@/lib/routes"
 import { changeUserRole } from "@/lib/user-role.server"
-import { CognitoPasswordError, deleteCognitoUser, updateCognitoUser } from "@/lib/cognito"
+import { CognitoPasswordError } from "@/lib/cognito"
 import { createUserAccount, normalizeEmail } from "@/lib/user-accounts"
+
+const EMAIL_LOCKED_MSG =
+  "El correo no se puede cambiar: es la cuenta de acceso en Cognito. Para usar otro, da de alta una cuenta nueva."
 
 export type ActionState = {
   success: boolean
   error?: string
   fieldErrors?: Record<string, string[]>
-  newPassword?: string
+  /** Correo al que Cognito mandó el código para cambiar la contraseña. */
+  sentTo?: string
 }
 
 async function assertAdminLike() {
@@ -119,7 +123,6 @@ export async function updateCoachAction(
       name: schema.user.name,
       role: schema.user.role,
       enabled: schema.user.enabled,
-      cognitoId: schema.user.cognitoId,
     })
     .from(schema.user)
     .where(eq(schema.user.id, parsed.data.id))
@@ -134,30 +137,17 @@ export async function updateCoachAction(
     return { success: false, error: "No puedes cambiar tu propio rol" }
   }
 
-  const emailNext = normalizeEmail(parsed.data.email)
-  if (emailNext !== existing.email) {
-    const [emailTaken] = await db
-      .select({ id: schema.user.id })
-      .from(schema.user)
-      .where(eq(schema.user.email, emailNext))
-      .limit(1)
-    if (emailTaken != null && emailTaken.id !== parsed.data.id) {
-      return { success: false, error: "El correo ya está registrado" }
-    }
+  // El correo es la cuenta de acceso en Cognito, y sin APIs de admin sólo la
+  // dueña puede cambiarlo.
+  if (normalizeEmail(parsed.data.email) !== existing.email) {
+    return { success: false, error: EMAIL_LOCKED_MSG }
   }
 
   try {
-    // Primero Cognito: el login entra con el correo de la base, así que los
-    // dos tienen que cambiar juntos.
-    if (emailNext !== existing.email) {
-      await updateCognitoUser(existing.cognitoId, { email: emailNext })
-    }
-
     await db
       .update(schema.user)
       .set({
         name: parsed.data.name,
-        email: emailNext,
         phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
         ...(enabledNext !== undefined ? { enabled: enabledNext } : {}),
       })
@@ -273,9 +263,9 @@ export async function resetCoachPasswordAction(
   }
 
   try {
-    const newPassword = await resetUserPassword(id)
+    const sentTo = await sendStudioPasswordReset(id)
     revalidatePath("/dashboard/coaches")
-    return { success: true, newPassword }
+    return { success: true, sentTo }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error al restablecer contraseña"
     return { success: false, error: msg }
@@ -294,7 +284,7 @@ export async function deleteCoachAction(
 
   const db = getDb()
   const [existing] = await db
-    .select({ role: schema.user.role, name: schema.user.name, cognitoId: schema.user.cognitoId })
+    .select({ role: schema.user.role, name: schema.user.name })
     .from(schema.user)
     .where(eq(schema.user.id, id))
     .limit(1)
@@ -325,7 +315,6 @@ export async function deleteCoachAction(
       .where(eq(schema.studioEvent.createdBy, id))
 
     await db.delete(schema.user).where(eq(schema.user.id, id))
-    await deleteCognitoUser(existing.cognitoId)
 
     revalidatePath("/dashboard/coaches")
     revalidatePath("/dashboard/clases")

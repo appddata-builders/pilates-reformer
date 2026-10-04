@@ -2,14 +2,7 @@ import { randomBytes } from "node:crypto"
 import { eq } from "drizzle-orm"
 import type { AnyDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
-import {
-  EmailTakenError,
-  createCognitoUser,
-  deleteCognitoUser,
-  findCognitoSub,
-  setCognitoPassword,
-  updateCognitoUser,
-} from "@/lib/cognito"
+import { EmailTakenError, signUpCognitoUser } from "@/lib/cognito"
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -32,22 +25,21 @@ export type NewUserAccount = {
 }
 
 /**
- * Alta completa: cuenta en Cognito con su contraseña y fila en `user` ligada
- * por `cognito_id`. Antes lo hacía better-auth (signUpEmail), que guardaba la
- * contraseña en la tabla `account`.
+ * Alta completa, como el sign-up de refautomex: SignUp en Cognito y fila en
+ * `user` con el `sub` (UserSub) en `cognito_id`. La cuenta queda sin confirmar:
+ * Cognito manda un código al correo y la persona lo escribe la primera vez que
+ * entra (app/login).
  *
- * Lanza EmailTakenError si el correo ya es de alguien y CognitoPasswordError
- * si la contraseña no pasa la política del user pool.
+ * Lanza EmailTakenError si el correo ya es de alguien (en la base o en
+ * Cognito) y CognitoPasswordError si la contraseña no pasa la política del
+ * user pool.
  */
 export async function createUserAccount(
   db: AnyDb,
   input: NewUserAccount,
 ): Promise<{ id: string }> {
   const email = normalizeEmail(input.email)
-  const name = input.name.trim()
 
-  // Antes de tocar Cognito: con el correo de otro usuario, el paso de abajo
-  // le cambiaría la contraseña.
   const [taken] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
@@ -55,41 +47,25 @@ export async function createUserAccount(
     .limit(1)
   if (taken != null) throw new EmailTakenError()
 
-  let sub = await findCognitoSub(email)
-  const created = sub == null
-  if (sub == null) {
-    sub = await createCognitoUser({ email, name })
-  } else {
-    // Cuenta huérfana: el usuario se borró de la base pero no de Cognito. Se
-    // reutiliza sólo si nadie la tiene ligada.
-    const [linked] = await db
-      .select({ id: schema.user.id })
-      .from(schema.user)
-      .where(eq(schema.user.cognitoId, sub))
-      .limit(1)
-    if (linked != null) throw new EmailTakenError()
-    await updateCognitoUser(sub, { email, name })
-  }
+  const { sub } = await signUpCognitoUser({ email, password: input.password })
 
+  const id = generateUserId()
   try {
-    await setCognitoPassword(sub, input.password)
-
-    const id = generateUserId()
     await db.insert(schema.user).values({
       id,
-      name,
+      name: input.name.trim(),
       email,
-      emailVerified: true,
       role: input.role,
       phone: input.phone ?? null,
       birthdate: input.birthdate ?? null,
       enabled: true,
       cognitoId: sub,
     })
-    return { id }
   } catch (e) {
-    // Sin la fila en la base la cuenta no sirve para entrar.
-    if (created) await deleteCognitoUser(sub)
+    // Sin APIs de admin no se puede deshacer el SignUp: la cuenta queda en
+    // Cognito y ese correo no se podrá volver a registrar hasta borrarla allá.
+    console.error(`[alta] La cuenta de Cognito de ${email} quedó sin fila en la base:`, e)
     throw e
   }
+  return { id }
 }

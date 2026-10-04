@@ -16,7 +16,7 @@ import {
 type ResetPasswordState = {
   success: boolean
   error?: string
-  newPassword?: string
+  sentTo?: string
 }
 
 const initial: ResetPasswordState = { success: false }
@@ -34,11 +34,11 @@ export function ResetPasswordControl(props: {
   const [state, formAction, pending] = useActionState(props.resetAction, initial)
 
   useEffect(() => {
-    if (state.success && state.newPassword != null && state.newPassword !== "") {
+    if (state.success && state.sentTo != null && state.sentTo !== "") {
       setConfirmOpen(false)
       setResultOpen(true)
     }
-  }, [state.success, state.newPassword])
+  }, [state.success, state.sentTo])
 
   return (
     <>
@@ -58,8 +58,8 @@ export function ResetPasswordControl(props: {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Restablecer contraseña?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se generará una contraseña nueva para {props.userLabel}. Las sesiones
-              activas se cerrarán.
+              Cognito le mandará a {props.userLabel} un código a su correo para que cree
+              una contraseña nueva. Sus sesiones se cierran cuando la cambie.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {state.error && !state.success ? (
@@ -72,7 +72,7 @@ export function ResetPasswordControl(props: {
                 Cancelar
               </AlertDialogCancel>
               <Button type="submit" disabled={pending}>
-                {pending ? "Restableciendo..." : "Sí, restablecer"}
+                {pending ? "Enviando..." : "Sí, enviar código"}
               </Button>
             </AlertDialogFooter>
           </form>
@@ -82,18 +82,15 @@ export function ResetPasswordControl(props: {
       <AlertDialog open={resultOpen} onOpenChange={setResultOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Contraseña restablecida</AlertDialogTitle>
+            <AlertDialogTitle>Código enviado</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-foreground">
                 <p>
-                  Usuario: <span className="font-semibold">{props.userLabel}</span>
-                </p>
-                <p>
-                  Nueva contraseña:{" "}
-                  <span className="font-mono font-semibold">{state.newPassword}</span>
+                  Le enviamos a <span className="font-semibold">{state.sentTo}</span> un
+                  código desde no-reply@verificationemail.com.
                 </p>
                 <p className="text-muted-foreground">
-                  El usuario recibirá una notificación de que su contraseña fue cambiada.
+                  Con ese código crea su contraseña en «¿Olvidaste tu contraseña?».
                 </p>
               </div>
             </AlertDialogDescription>

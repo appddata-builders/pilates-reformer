@@ -43,12 +43,13 @@ export function RegistryForm(props: { registryToken: string }) {
       <Card className="w-full max-w-md border shadow-sm">
         <CardHeader className="space-y-1">
           <CardTitle className="text-xl">Cuenta creada</CardTitle>
-          <CardDescription>Ya puedes reservar clases</CardDescription>
+          <CardDescription>Revisa tu correo</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground text-center">
-            Para entrar al panel usa tu correo y la contraseña que elegiste. Tu plan lo
-            confirma el estudio.
+            Te mandamos un código desde no-reply@verificationemail.com. La primera vez que
+            entres con tu correo y contraseña te lo vamos a pedir. Tu plan lo confirma el
+            estudio.
           </p>
         </CardContent>
         <CardFooter className="flex flex-col gap-2">

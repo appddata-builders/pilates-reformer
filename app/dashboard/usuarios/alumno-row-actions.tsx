@@ -191,8 +191,12 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
                 name="email"
                 type="email"
                 defaultValue={props.alumno.email}
+                readOnly
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Es su cuenta de acceso en Cognito; no se puede cambiar.
+              </p>
               {editState.fieldErrors?.email ? (
                 <p className="text-destructive text-sm">{editState.fieldErrors.email[0]}</p>
               ) : null}
@@ -283,7 +287,9 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
             <AlertDialogTitle>¿Borrar este usuario?</AlertDialogTitle>
             <AlertDialogDescription>
               Se eliminará el registro de {displayLabel} ({props.alumno.email}), incluyendo
-              reservas, pagos y planes asociados. Esta acción no se puede deshacer.
+              reservas, pagos y planes asociados. Esta acción no se puede deshacer. Su
+              cuenta de Cognito se queda: para reusar ese correo hay que borrarla en la
+              consola de Cognito. Para sólo quitarle el acceso, inhabilítala.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteState.error ? (
