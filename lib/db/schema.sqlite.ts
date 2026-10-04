@@ -137,6 +137,8 @@ export const booking = sqliteTable(
      * confirma el coach y la que leen Reportes e Histórico.
      */
     takenAt: integer("taken_at", { mode: "timestamp_ms" }),
+    // La reserva usó la clase muestra: al cancelarla, la cortesía regresa.
+    trialClass: integer("trial_class", { mode: "boolean" }).notNull().default(false),
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     notes: text("notes"),
     reformerNumber: integer("reformer_number"),

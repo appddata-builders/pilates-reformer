@@ -21,7 +21,7 @@ import {
   pickPrimarySubscription,
 } from "@/lib/subscription-display"
 import { isSlotDisabledOnDate } from "@/lib/slot-exceptions"
-import { voidPendingChargeForBooking } from "@/lib/class-charge"
+import { restoreTrialClass, voidPendingChargeForBooking } from "@/lib/class-charge"
 import { planWeeklyLimit } from "@/lib/plan-quota"
 
 export type CreateBookingResult =
@@ -652,6 +652,8 @@ export type CancelBookingResult =
       ok: true
       late: boolean
       restoredClass: boolean
+      /** La reserva era la clase muestra y la cortesía quedó disponible otra vez. */
+      restoredTrial: boolean
       /** Adeudo pendiente que se anuló junto con la reserva; 0 si no había. */
       voidedChargeAmount: number
     }
@@ -670,6 +672,7 @@ export async function cancelBookingById(
       bookingDate: schema.booking.bookingDate,
       startTime: schema.scheduleSlot.startTime,
       takenAt: schema.booking.takenAt,
+      trialClass: schema.booking.trialClass,
     })
     .from(schema.booking)
     .innerJoin(schema.scheduleSlot, eq(schema.booking.scheduleSlotId, schema.scheduleSlot.id))
@@ -699,6 +702,14 @@ export async function cancelBookingById(
 
   const classStart = classStartFromBooking(bookingDate, booking.startTime)
 
+  // Clase muestra o clase individual (con cobro propio): no salió de un plan.
+  const [individualCharge] = await db
+    .select({ id: schema.payment.id })
+    .from(schema.payment)
+    .where(and(eq(schema.payment.bookingId, bookingId), isNull(schema.payment.subscriptionId)))
+    .limit(1)
+  const outsidePlan = booking.trialClass === true || individualCharge != null
+
   let restoreClass = false
   let late = false
 
@@ -724,19 +735,28 @@ export async function cancelBookingById(
         )
 
       const primary = pickPrimarySubscription(subs)
-      const selfRelease = evaluateStudentSelfRelease({
-        bookingDate,
-        subscriptionStatus: primary?.status ?? "inactive",
-        subscriptionStartDate: primary?.startDate ?? new Date(0),
-        subscriptionEndDate: primary?.endDate ?? new Date(0),
-        now,
-      })
-      const check = evaluateAlumnoSelfCancellation(now, classStart, policy, selfRelease)
-      if (!check.ok) {
-        return { ok: false, message: check.message }
+
+      // Sin plan de por medio una clase sí se puede cancelar: la única regla es
+      // que todavía no empiece. Las del plan siguen las reglas del plan.
+      if (outsidePlan || primary == null) {
+        if (now >= classStart) {
+          return { ok: false, message: "La clase ya empezó; ya no se puede cancelar." }
+        }
+      } else {
+        const selfRelease = evaluateStudentSelfRelease({
+          bookingDate,
+          subscriptionStatus: primary.status,
+          subscriptionStartDate: primary.startDate,
+          subscriptionEndDate: primary.endDate,
+          now,
+        })
+        const check = evaluateAlumnoSelfCancellation(now, classStart, policy, selfRelease)
+        if (!check.ok) {
+          return { ok: false, message: check.message }
+        }
+        restoreClass = check.restoreClass
+        late = check.late
       }
-      restoreClass = check.restoreClass
-      late = check.late
     } else {
       const check = evaluateCancellation(now, classStart, policy)
       if (!check.ok) {
@@ -761,14 +781,10 @@ export async function cancelBookingById(
 
   if (cancelled.length === 0) return { ok: false, message: "La reserva cambió. Actualiza el calendario." }
 
-  // Una clase individual nunca consumió saldo del plan: cancelarla no debe
-  // regalar una clase. Conservamos esta distinción incluso si ya fue pagada.
-  const [individualCharge] = await db
-    .select({ id: schema.payment.id })
-    .from(schema.payment)
-    .where(and(eq(schema.payment.bookingId, bookingId), isNull(schema.payment.subscriptionId)))
-    .limit(1)
-  if (individualCharge != null) restoreClass = false
+  // Una clase muestra o individual nunca consumió saldo del plan: cancelarla
+  // no debe regalar una clase. Conservamos esta distinción incluso si ya fue
+  // pagada.
+  if (outsidePlan) restoreClass = false
 
   // La clase que no cubrió un plan dejó un adeudo abierto: al liberar el lugar
   // ese cobro tiene que morir con la reserva, o la alumna arrastra una deuda
@@ -784,6 +800,11 @@ export async function cancelBookingById(
     userId: booking.userId,
     userName: owner?.name ?? "Usuario",
   })
+
+  // La clase muestra regresa para usarla en otra fecha.
+  if (booking.trialClass === true) {
+    await restoreTrialClass(db, { userId: booking.userId, userName: owner?.name ?? "Usuario" })
+  }
 
   if (restoreClass) {
     const [activeSub] = await db
@@ -806,6 +827,7 @@ export async function cancelBookingById(
     ok: true,
     late,
     restoredClass: restoreClass,
+    restoredTrial: booking.trialClass === true,
     voidedChargeAmount: voided.voidedAmount,
   }
 }

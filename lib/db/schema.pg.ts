@@ -145,6 +145,8 @@ export const booking = pgTable(
      * confirma el coach y la que leen Reportes e Histórico.
      */
     takenAt: timestamp("taken_at", { precision: 3, mode: "date" }),
+    // La reserva usó la clase muestra: al cancelarla, la cortesía regresa.
+    trialClass: boolean("trial_class").notNull().default(false),
     cancelledAt: timestamp("cancelled_at", { precision: 3, mode: "date" }),
     notes: text("notes"),
     reformerNumber: integer("reformer_number"),

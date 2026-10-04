@@ -465,6 +465,7 @@ export async function createPublicBookingAction(
           userName: result.userName,
           className,
           bookingDate,
+          bookingId: result.bookingId,
         })
       : null
 
@@ -538,13 +539,18 @@ export async function cancelOwnBookingAction(
 
   revalidatePath("/dashboard/reservas")
   revalidatePath("/dashboard/pagos")
+  // La portada ofrece la clase muestra a quien todavía la tiene.
+  if (result.restoredTrial) revalidatePath("/")
 
-  return {
-    success: true,
-    message: result.restoredClass
-      ? "Liberaste tu lugar y la clase regresó a tu plan."
-      : "Liberaste tu lugar.",
+  let message = "Liberaste tu lugar."
+  if (result.restoredTrial) {
+    message = "Liberaste tu lugar y tu clase muestra quedó disponible otra vez."
+  } else if (result.restoredClass) {
+    message = "Liberaste tu lugar y la clase regresó a tu plan."
+  } else if (result.voidedChargeAmount > 0) {
+    message = "Liberaste tu lugar y se canceló el cobro pendiente de esa clase."
   }
+  return { success: true, message }
 }
 
 /** La alumna da por tomada su clase. No toca la asistencia oficial del coach. */

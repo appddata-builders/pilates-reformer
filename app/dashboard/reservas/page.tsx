@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic"
 import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
-import { and, asc, count, eq, gte, lte } from "drizzle-orm"
+import { and, asc, count, eq, gte, inArray, isNull, lte } from "drizzle-orm"
 import { isAlumnoRole, getSessionUserId } from "@/lib/alumno-scope"
 import { evaluateStudentSelfRelease } from "@/lib/booking-rules"
+import { classStartFromBooking } from "@/lib/cancellation-policy"
 import {
   isSubscriptionCurrent,
   pickPrimarySubscription,
@@ -192,6 +193,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
       instructor: schema.scheduleSlot.instructor,
       alternateInstructor: schema.scheduleSlot.alternateInstructor,
       scheduleMode: schema.scheduleSlot.scheduleMode,
+      trialClass: schema.booking.trialClass,
     })
     .from(schema.booking)
     .innerJoin(schema.user, eq(schema.booking.userId, schema.user.id))
@@ -204,12 +206,33 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
   const showAlumnaOnCard = !isAlumno
   const now = new Date()
 
-  function alumnoCanCancelBooking(bookingDateRaw: Date | unknown): boolean {
-    if (!isAlumno || alumnoSubscription == null) return false
+  // Clases individuales de la alumna (con cobro propio, fuera del plan).
+  const individualBookingIds = new Set<string>()
+  if (isAlumno && reservas.length > 0) {
+    const charges = await db
+      .select({ bookingId: schema.payment.bookingId })
+      .from(schema.payment)
+      .where(and(
+        inArray(schema.payment.bookingId, reservas.map((r) => r.id)),
+        isNull(schema.payment.subscriptionId),
+      ))
+    for (const c of charges) {
+      if (c.bookingId != null) individualBookingIds.add(c.bookingId)
+    }
+  }
+
+  // Misma regla que cancelBookingById: sin plan de por medio (clase muestra,
+  // individual o sin paquete) se libera mientras la clase no empiece; las del
+  // plan siguen las reglas del plan.
+  function alumnoCanCancelBooking(r: (typeof reservas)[number]): boolean {
+    if (!isAlumno) return false
     const bookingDate =
-      bookingDateRaw instanceof Date
-        ? bookingDateRaw
-        : new Date(bookingDateRaw as number)
+      r.bookingDate instanceof Date
+        ? r.bookingDate
+        : new Date(r.bookingDate as unknown as number)
+    if (r.trialClass === true || individualBookingIds.has(r.id) || alumnoSubscription == null) {
+      return now < classStartFromBooking(bookingDate, r.startTime)
+    }
     const check = evaluateStudentSelfRelease({
       bookingDate,
       subscriptionStatus: alumnoSubscription.status,
@@ -313,7 +336,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
                 }}
                 showAlumna={showAlumnaOnCard}
                 canCancel={
-                  staffCanCancel || (isAlumno && alumnoCanCancelBooking(r.bookingDate))
+                  staffCanCancel || (isAlumno && alumnoCanCancelBooking(r))
                 }
                 cancelMode={isAlumno ? "self" : "admin"}
               />

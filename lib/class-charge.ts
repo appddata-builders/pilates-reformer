@@ -155,11 +155,18 @@ export type TrialClassResult = { ok: true } | { ok: false; error: string }
 
 /**
  * Redime la clase muestra. La marca se escribe condicionada a que siga en NULL,
- * para que dos reservas simultáneas no puedan gastar la misma cortesía.
+ * para que dos reservas simultáneas no puedan gastar la misma cortesía. La
+ * reserva queda marcada para devolver la cortesía si se cancela.
  */
 export async function consumeTrialClass(
   db: AnyDb,
-  params: { userId: string; userName: string; className: string; bookingDate: Date },
+  params: {
+    userId: string
+    userName: string
+    className: string
+    bookingDate: Date
+    bookingId: string
+  },
 ): Promise<TrialClassResult> {
   const marked = await db
     .update(schema.user)
@@ -170,6 +177,11 @@ export async function consumeTrialClass(
   if (marked.length === 0) {
     return { ok: false, error: "Ya redimiste tu clase muestra" }
   }
+
+  await db
+    .update(schema.booking)
+    .set({ trialClass: true })
+    .where(eq(schema.booking.id, params.bookingId))
 
   const fechaLabel = params.bookingDate.toLocaleDateString("es-MX", {
     day: "numeric",
@@ -184,6 +196,24 @@ export async function consumeTrialClass(
   })
 
   return { ok: true }
+}
+
+/** Devuelve la clase muestra cuando se cancela la reserva que la usó. */
+export async function restoreTrialClass(
+  db: AnyDb,
+  params: { userId: string; userName: string },
+): Promise<void> {
+  await db
+    .update(schema.user)
+    .set({ trialClassUsedAt: null })
+    .where(eq(schema.user.id, params.userId))
+
+  await createNotification(db, {
+    userId: params.userId,
+    type: "trial_class",
+    title: "Tu clase muestra está disponible",
+    body: `Hola ${params.userName}, cancelaste tu clase muestra. Sigue disponible para que la uses en otra fecha.`,
+  })
 }
 
 /**
