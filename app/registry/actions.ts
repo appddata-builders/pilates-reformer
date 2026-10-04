@@ -5,7 +5,7 @@ import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { normalizeBirthdateInput } from "@/lib/birthdate"
 import {
-  REGISTRY_EMAIL_FIELD_ERROR,
+  REGISTRY_EMAIL_TAKEN_ERROR,
   REGISTRY_GENERIC_ERROR,
 } from "@/lib/registry-errors"
 import { sendWelcomeNotification } from "@/lib/welcome-message"
@@ -108,7 +108,7 @@ export async function hiddenRegistryAction(
   if (emailTaken != null) {
     return {
       success: false,
-      fieldErrors: { email: [REGISTRY_EMAIL_FIELD_ERROR] },
+      fieldErrors: { email: [REGISTRY_EMAIL_TAKEN_ERROR] },
     }
   }
 
@@ -140,7 +140,7 @@ export async function hiddenRegistryAction(
     if (e instanceof EmailTakenError) {
       return {
         success: false,
-        fieldErrors: { email: [REGISTRY_EMAIL_FIELD_ERROR] },
+        fieldErrors: { email: [REGISTRY_EMAIL_TAKEN_ERROR] },
       }
     }
     if (e instanceof CognitoPasswordError) {
@@ -150,7 +150,7 @@ export async function hiddenRegistryAction(
     if (msg.toLowerCase().includes("unique")) {
       return {
         success: false,
-        fieldErrors: { email: [REGISTRY_EMAIL_FIELD_ERROR] },
+        fieldErrors: { email: [REGISTRY_EMAIL_TAKEN_ERROR] },
       }
     }
     return { success: false, error: REGISTRY_GENERIC_ERROR }
