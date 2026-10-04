@@ -20,6 +20,7 @@ import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { WelcomeModal } from "./_welcome-modal"
 import { sendTodayBirthdayNotifications } from "@/lib/birthday-notifications"
+import { sendPlanRenewalReminders } from "@/lib/plan-requests"
 import { getStudioBranding } from "@/lib/studio-branding"
 
 export default async function DashboardLayout({
@@ -61,6 +62,9 @@ export default async function DashboardLayout({
 
   const db = getDb()
   await sendTodayBirthdayNotifications(db)
+  if (isAlumno) {
+    await sendPlanRenewalReminders(db, session.user.id)
+  }
 
   const [navPermissions, studioBranding] = await Promise.all([
     loadNavPermissions(),

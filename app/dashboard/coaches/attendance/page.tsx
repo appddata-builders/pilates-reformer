@@ -10,7 +10,9 @@ import { Button } from "@/components/shared/ui/button"
 import { dateRangeForDay, localTodayStr } from "@/lib/booking-slot-options"
 import { coachTeachesSlot, formatSlotInstructorLabel } from "@/lib/schedule-instructor"
 import { formatTimeRange12h } from "@/lib/time-utils"
-import { AttendanceMarkForm } from "./attendance-mark-form"
+import { AttendanceControls } from "./attendance-controls"
+import { getAttendanceCatalog } from "@/lib/coach-attendance"
+import { redirect } from "next/navigation"
 
 type SearchParams = Promise<{ date?: string }>
 
@@ -25,11 +27,14 @@ export default async function CoachAttendancePage({
   const coachName =
     typeof session?.user?.name === "string" ? session.user.name.trim() : ""
 
+  if (!["coach", "admin", "root"].includes(role)) redirect("/dashboard")
+
   const todayStr = localTodayStr()
   const dateStr = params.date ?? todayStr
   const { start: dayStart, end: dayEnd } = dateRangeForDay(dateStr)
 
   const db = getDb()
+  const catalog = await getAttendanceCatalog(db)
 
   const conditions = [
     gte(schema.booking.bookingDate, dayStart),
@@ -62,7 +67,7 @@ export default async function CoachAttendancePage({
     .orderBy(schema.scheduleSlot.startTime, schema.user.name)
 
   const bookings =
-    role === "coach" && coachName !== ""
+    role === "coach"
       ? bookingRows.filter((row) =>
           coachTeachesSlot(
             {
@@ -168,33 +173,7 @@ export default async function CoachAttendancePage({
                       </p>
                     </div>
 
-                    <div className="flex gap-2">
-                      <AttendanceMarkForm bookingId={b.bookingId} attended="true" dateStr={dateStr}>
-                        <button
-                          type="submit"
-                          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                            b.attended === true
-                              ? "bg-green-100 border-green-300 text-green-700"
-                              : "border-border text-muted-foreground hover:bg-green-50 hover:border-green-200 hover:text-green-700"
-                          }`}
-                        >
-                          ✓ Asistió
-                        </button>
-                      </AttendanceMarkForm>
-
-                      <AttendanceMarkForm bookingId={b.bookingId} attended="false" dateStr={dateStr}>
-                        <button
-                          type="submit"
-                          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                            b.attended === false
-                              ? "bg-red-100 border-red-300 text-red-700"
-                              : "border-border text-muted-foreground hover:bg-red-50 hover:border-red-200 hover:text-red-700"
-                          }`}
-                        >
-                          ✗ No asistió
-                        </button>
-                      </AttendanceMarkForm>
-                    </div>
+                    <AttendanceControls bookingId={b.bookingId} attended={b.attended} catalog={catalog} />
                   </li>
                 ))}
               </ul>

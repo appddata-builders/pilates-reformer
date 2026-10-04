@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { AttendanceControls } from "../attendance/attendance-controls"
 import { Users } from "lucide-react"
 import { Badge } from "@/components/shared/ui/badge"
 import {
@@ -19,18 +20,20 @@ export function SlotRosterDialog(props: {
   bookingDateStr: string
   timeLabel: string
 }) {
-  const [roster, setRoster] = useState<SlotRoster | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState<{ key: string; roster: SlotRoster } | null>(null)
+  const [revision, setRevision] = useState(0)
+  const requestKey = `${props.scheduleSlotId}:${props.bookingDateStr}:${revision}`
+  const loading = loaded?.key !== requestKey
+  const roster = loading ? null : loaded.roster
 
   useEffect(() => {
     if (!props.open) return
-    setLoading(true)
-    setRoster(null)
+    let cancelled = false
     getSlotRosterAction(props.scheduleSlotId, props.bookingDateStr)
-      .then((r) => setRoster(r))
-      .catch(() => setRoster({ ok: false, error: "No se pudo cargar la lista" }))
-      .finally(() => setLoading(false))
-  }, [props.open, props.scheduleSlotId, props.bookingDateStr])
+      .then((roster) => { if (!cancelled) setLoaded({ key: requestKey, roster }) })
+      .catch(() => { if (!cancelled) setLoaded({ key: requestKey, roster: { ok: false, error: "No se pudo cargar la lista" } }) })
+    return () => { cancelled = true }
+  }, [props.open, props.scheduleSlotId, props.bookingDateStr, requestKey])
 
   const students = roster?.ok ? roster.students : []
 
@@ -72,6 +75,11 @@ export function SlotRosterDialog(props: {
                     <p className="truncate font-mono text-xs text-muted-foreground">
                       {s.phone ?? "—"}
                     </p>
+                    <p className="truncate text-xs text-muted-foreground">{s.email}</p>
+                    {roster.canMarkAttendance ? <div className="mt-2">
+                      <AttendanceControls bookingId={s.bookingId} attended={s.attended}
+                        catalog={roster.catalog} onSaved={() => setRevision((value) => value + 1)} />
+                    </div> : null}
                   </div>
                   {s.attended === true ? (
                     <Badge className="border-green-200 bg-green-100 text-[10px] text-green-700">

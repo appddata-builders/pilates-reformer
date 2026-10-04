@@ -44,6 +44,7 @@ const EMPTY_CONTEXT: MyBookingContext = {
   loggedIn: false,
   myBookingKeys: [],
   takenBookingKeys: [],
+  individualBookingKeys: [],
   myBookingDates: [],
   weeklyUsage: {},
   plan: null,
@@ -132,6 +133,7 @@ export default function SetupWeeklySchedule({
 
   const myBookingKeys = new Set(ctx.myBookingKeys)
   const takenKeys = new Set(ctx.takenBookingKeys)
+  const individualKeys = new Set(ctx.individualBookingKeys)
   const plan = ctx.plan
   // El tope semanal se mide contra la semana que se está viendo, no contra hoy:
   // el tablero deja moverse a semanas futuras y cada una lleva su propia cuenta.
@@ -142,6 +144,11 @@ export default function SetupWeeklySchedule({
 
   function isMine(slotId: string, dateStr: string): boolean {
     return myBookingKeys.has(`${slotId}|${dateStr}`)
+  }
+
+  /** Clase individual: blanca en el tablero; las del plan y la muestra, beige. */
+  function isIndividual(slotId: string, dateStr: string): boolean {
+    return individualKeys.has(`${slotId}|${dateStr}`)
   }
 
   /** Clase quemada: ya la dio por tomada y no queda nada que hacer con ella. */
@@ -297,6 +304,7 @@ export default function SetupWeeklySchedule({
                       const enrolled = getEnrolled(slot, day.dayOfWeek)
                       const mine = isMine(slot.id, bookingDate)
                       const taken = isTaken(slot.id, bookingDate)
+                      const individual = isIndividual(slot.id, bookingDate)
                       const disabled = isBoardSlotDisabled(
                         disabledSlotDateKeys,
                         slot.id,
@@ -350,7 +358,9 @@ export default function SetupWeeklySchedule({
                               taken
                                 ? "cursor-default bg-green-base/60 text-white/70 ring-1 ring-white/40"
                                 : mine
-                                  ? "cursor-pointer bg-white text-green-base ring-2 ring-white hover:bg-white/90"
+                                  ? individual
+                                    ? "cursor-pointer bg-white text-green-base ring-2 ring-white hover:bg-white/90"
+                                    : "cursor-pointer bg-beige text-green-base ring-2 ring-beige hover:bg-beige/90"
                                   : canOpen
                                   ? "cursor-pointer bg-green-base text-white hover:bg-green-hover"
                                   : past

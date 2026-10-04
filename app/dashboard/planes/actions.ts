@@ -10,6 +10,7 @@ import {
   duplicatePlanErrorMessage,
   findDuplicatePlan,
 } from "@/lib/site/plans"
+import { requestPlan } from "@/lib/plan-requests"
 
 export type ActionState = {
   success: boolean
@@ -295,4 +296,40 @@ export async function deletePlanAction(
   revalidatePath("/")
   revalidatePath("/agendar")
   return { success: true }
+}
+
+export type PlanRequestActionState = {
+  success: boolean
+  error?: string
+  message?: string
+}
+
+/** La alumna solicita un plan o renueva el que terminó, a cuenta. */
+export async function requestPlanAction(
+  _prev: PlanRequestActionState,
+  formData: FormData,
+): Promise<PlanRequestActionState> {
+  const session = await getSession()
+  if (session == null || session.user.role !== "alumno") {
+    return { success: false, error: "No autorizado" }
+  }
+
+  const planId = formData.get("planId")
+  if (typeof planId !== "string" || planId.trim() === "") {
+    return { success: false, error: "Elige un plan" }
+  }
+
+  const result = await requestPlan(getDb(), {
+    userId: session.user.id,
+    planId: planId.trim(),
+    renewal: formData.get("renewal") === "true",
+  })
+  if (!result.ok) return { success: false, error: result.error }
+
+  revalidatePath("/dashboard/planes")
+  revalidatePath("/dashboard/reservas")
+  revalidatePath("/dashboard/pagos")
+  revalidatePath("/dashboard/usuarios")
+  revalidatePath("/agendar")
+  return { success: true, message: result.message }
 }

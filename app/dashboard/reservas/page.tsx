@@ -1,5 +1,8 @@
 export const dynamic = "force-dynamic"
 
+import { getAttendanceCatalog } from "@/lib/coach-attendance"
+import { AttendanceControls } from "../coaches/attendance/attendance-controls"
+import { coachTeachesSlot } from "@/lib/schedule-instructor"
 import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
@@ -53,6 +56,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
   const staffCanCancel = isAdminRoot || isCoach
 
   const db = getDb()
+  const attendanceCatalog = isCoach || isAdminRoot ? await getAttendanceCatalog(db) : []
 
   let alumnoSubscription: {
     status: string
@@ -187,6 +191,8 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
       status: schema.booking.status,
       bookingDate: schema.booking.bookingDate,
       userName: schema.user.name,
+      userEmail: schema.user.email,
+      attended: schema.booking.attended,
       className: schema.scheduleSlot.className,
       startTime: schema.scheduleSlot.startTime,
       endTime: schema.scheduleSlot.endTime,
@@ -206,9 +212,10 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
   const showAlumnaOnCard = !isAlumno
   const now = new Date()
 
-  // Clases individuales de la alumna (con cobro propio, fuera del plan).
+  // Clases individuales (con cobro propio, fuera del plan): tarjeta blanca; las
+  // del plan y la clase muestra van en beige.
   const individualBookingIds = new Set<string>()
-  if (isAlumno && reservas.length > 0) {
+  if (reservas.length > 0) {
     const charges = await db
       .select({ bookingId: schema.payment.bookingId })
       .from(schema.payment)
@@ -255,7 +262,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
           })()
         : `${totalItems} reservas en este día`
 
-  let emptyMessage = isAlumno
+  const emptyMessage = isAlumno
     ? "No tienes reservas para esta fecha"
     : "Sin reservas para esta fecha"
 
@@ -321,7 +328,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
       ) : (
         <div data-tour="page-table" className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {reservas.map((r) => (
-            <div key={r.id} className="h-full">
+            <div key={r.id} className="flex h-full flex-col">
               <ReservaCard
                 reserva={{
                   id: r.id,
@@ -335,11 +342,18 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
                   studentName: r.userName,
                 }}
                 showAlumna={showAlumnaOnCard}
+                individual={individualBookingIds.has(r.id)}
                 canCancel={
                   staffCanCancel || (isAlumno && alumnoCanCancelBooking(r))
                 }
                 cancelMode={isAlumno ? "self" : "admin"}
               />
+              {r.status === "confirmed" && (isAdminRoot || (isCoach && coachTeachesSlot(r, session?.user.name ?? ""))) ? (
+                <div className="space-y-2 border rounded-md p-3 mt-2">
+                  <p className="text-xs text-muted-foreground">{r.userEmail}</p>
+                  <AttendanceControls bookingId={r.id} attended={r.attended} catalog={attendanceCatalog} />
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

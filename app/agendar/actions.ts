@@ -2,7 +2,7 @@
 
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
-import { and, asc, eq, gte, lte } from "drizzle-orm"
+import { and, asc, eq, gte, inArray, isNull, lte } from "drizzle-orm"
 import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
@@ -248,6 +248,8 @@ export type MyBookingContext = {
   myBookingKeys: string[]
   /** De las anteriores, las que ya marqué como tomadas: quedan quemadas. */
   takenBookingKeys: string[]
+  /** De las anteriores, las individuales (con cobro propio, fuera del plan). */
+  individualBookingKeys: string[]
   /** Fechas donde ya tengo al menos una clase, para avisar del doble en un día. */
   myBookingDates: string[]
   /** Reservas mías por semana del estudio: lunes `YYYY-MM-DD` -> cuántas. */
@@ -266,6 +268,7 @@ const EMPTY_CONTEXT: MyBookingContext = {
   loggedIn: false,
   myBookingKeys: [],
   takenBookingKeys: [],
+  individualBookingKeys: [],
   myBookingDates: [],
   weeklyUsage: {},
   plan: null,
@@ -289,6 +292,7 @@ export async function loadMyBookingContextAction(): Promise<MyBookingContext> {
 
     const rows = await db
       .select({
+        id: schema.booking.id,
         slotId: schema.booking.scheduleSlotId,
         bookingDate: schema.booking.bookingDate,
         takenAt: schema.booking.takenAt,
@@ -303,8 +307,23 @@ export async function loadMyBookingContextAction(): Promise<MyBookingContext> {
         ),
       )
 
+    const individualIds = new Set<string>()
+    if (rows.length > 0) {
+      const charges = await db
+        .select({ bookingId: schema.payment.bookingId })
+        .from(schema.payment)
+        .where(and(
+          inArray(schema.payment.bookingId, rows.map((r) => r.id)),
+          isNull(schema.payment.subscriptionId),
+        ))
+      for (const c of charges) {
+        if (c.bookingId != null) individualIds.add(c.bookingId)
+      }
+    }
+
     const myBookingKeys: string[] = []
     const takenBookingKeys: string[] = []
+    const individualBookingKeys: string[] = []
     const dates = new Set<string>()
     const weeklyUsage: Record<string, number> = {}
     for (const row of rows) {
@@ -316,6 +335,7 @@ export async function loadMyBookingContextAction(): Promise<MyBookingContext> {
       const key = `${row.slotId}|${dateStr}`
       myBookingKeys.push(key)
       if (row.takenAt != null) takenBookingKeys.push(key)
+      if (individualIds.has(row.id)) individualBookingKeys.push(key)
       dates.add(dateStr)
       const weekKey = toLocalDateStr(startOfStudioWeek(date))
       weeklyUsage[weekKey] = (weeklyUsage[weekKey] ?? 0) + 1
@@ -363,6 +383,7 @@ export async function loadMyBookingContextAction(): Promise<MyBookingContext> {
       loggedIn: true,
       myBookingKeys,
       takenBookingKeys,
+      individualBookingKeys,
       myBookingDates: Array.from(dates),
       weeklyUsage,
       plan,

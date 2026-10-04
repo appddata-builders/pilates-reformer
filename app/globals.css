@@ -9,6 +9,8 @@
   --green-base: #1d4d44;
   --green-hover: #163a33;
   --green-mid: #2f6b5f;
+  /* Reservas del plan y clase muestra; las individuales se quedan en blanco. */
+  --beige: #f3e5bf;
   --r-card: 24px;
   --r-inner: 14px;
   --card: oklch(1 0 0);
@@ -88,6 +90,7 @@
   --color-green-base: var(--green-base);
   --color-green-hover: var(--green-hover);
   --color-green-mid: var(--green-mid);
+  --color-beige: var(--beige);
   --radius-card: var(--r-card);
   --radius-inner: var(--r-inner);
   --color-card: var(--card);

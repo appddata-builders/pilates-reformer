@@ -3,57 +3,26 @@
 import { revalidatePath } from "next/cache"
 import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
-import * as schema from "@/lib/db/schema"
-import { eq } from "drizzle-orm"
+import { recordCoachAttendance, type AttendanceResult } from "@/lib/coach-attendance"
 
-export async function toggleAttendanceAction(formData: FormData): Promise<void> {
+export async function toggleAttendanceAction(formData: FormData): Promise<AttendanceResult> {
   const session = await getSession()
-  const role = (session?.user as { role?: string } | undefined)?.role
-  if (!session || (role !== "admin" && role !== "coach")) return
-
+  if (!session) return { success: false, error: "No autorizado" }
   const bookingId = formData.get("bookingId")
-  const attendedRaw = formData.get("attended")
-  if (typeof bookingId !== "string" || typeof attendedRaw !== "string") return
-
-  const attended = attendedRaw === "true"
-  const db = getDb()
-
-  const [booking] = await db
-    .select({
-      id: schema.booking.id,
-      status: schema.booking.status,
-      userId: schema.booking.userId,
-      countedAsAttended: schema.booking.countedAsAttended,
-    })
-    .from(schema.booking)
-    .where(eq(schema.booking.id, bookingId))
-    .limit(1)
-
-  if (!booking) return
-
-  if (!attended && booking.status === "confirmed") {
-    await db
-      .update(schema.booking)
-      .set({ attended: false, countedAsAttended: true })
-      .where(eq(schema.booking.id, bookingId))
-  } else if (attended) {
-    await db
-      .update(schema.booking)
-      .set({ attended: true, countedAsAttended: true })
-      .where(eq(schema.booking.id, bookingId))
-  } else {
-    await db
-      .update(schema.booking)
-      .set({ attended })
-      .where(eq(schema.booking.id, bookingId))
+  const attended = formData.get("attended")
+  const catalogId = formData.get("catalogId")
+  if (typeof bookingId !== "string" || !["true", "false"].includes(String(attended)) ||
+      (catalogId != null && typeof catalogId !== "string")) {
+    return { success: false, error: "Datos de asistencia inválidos" }
   }
-
-  const dateRaw = formData.get("date")
-  const dateQuery =
-    typeof dateRaw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateRaw)
-      ? `?date=${dateRaw}`
-      : ""
-
-  revalidatePath(`/dashboard/coaches/attendance${dateQuery}`)
-  revalidatePath("/dashboard/reportes")
+  const result = await recordCoachAttendance(getDb(), {
+    bookingId, attended: attended === "true", catalogId: catalogId || undefined,
+    actor: { id: session.user.id, name: session.user.name ?? "", role: session.user.role ?? "" },
+  })
+  if (result.success) {
+    for (const path of ["/dashboard/coaches/attendance", "/dashboard/coaches/schedule",
+      "/dashboard/reportes", "/dashboard/reservas", "/dashboard/pagos", "/dashboard/planes",
+      "/dashboard/usuarios", "/dashboard/historico", "/agendar"]) revalidatePath(path)
+  }
+  return result
 }

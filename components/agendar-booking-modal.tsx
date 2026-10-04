@@ -564,7 +564,7 @@ function AgendarBookingForm(props: {
                   ))}
                 </ul>
                 <Link
-                  href="/#planes"
+                  href={routes.planes}
                   className="inline-flex rounded-full bg-green-base px-4 py-2 text-xs font-semibold text-white transition hover:bg-green-hover"
                 >
                   {t("booking.planSuggestCta")}

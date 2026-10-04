@@ -44,6 +44,8 @@ function statusBadge(status: string) {
 export function ReservaCard(props: {
   reserva: ReservaCardData
   showAlumna?: boolean
+  /** Clase individual (cobro propio): blanca. Las del plan y la muestra, beige. */
+  individual?: boolean
   canCancel?: boolean
   cancelMode?: "admin" | "self"
 }) {
@@ -56,7 +58,11 @@ export function ReservaCard(props: {
     (cancelMode === "self" || r.studentName != null)
 
   return (
-    <Card className="flex h-full flex-col gap-0 border py-0 shadow-sm">
+    <Card
+      className={`flex h-full flex-col gap-0 border py-0 shadow-sm ${
+        r.status === "confirmed" && props.individual !== true ? "bg-beige" : ""
+      }`}
+    >
       <CardContent className="flex h-full flex-col p-3">
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="min-w-0 flex-1">

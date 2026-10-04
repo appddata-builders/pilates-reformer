@@ -5,6 +5,8 @@ import { Button } from "@/components/shared/ui/button"
 import { Card, CardContent } from "@/components/shared/ui/card"
 import { PageHeader } from "@/components/features/admin/page-header"
 import { routes } from "@/lib/routes"
+import type { PlanRequestState, RequestablePlan } from "@/lib/plan-requests"
+import { RequestPlanButton } from "./request-plan-button"
 
 export type MiPlanRow = {
   id: string
@@ -35,7 +37,28 @@ function conceptLabel(planType: string): string {
   return planType === "monthly" ? "Plan activo" : "Paquete"
 }
 
-export function MisPlanes(props: { rows: MiPlanRow[]; pendingBalance: number }) {
+function periodLabel(durationDays: number): string {
+  if (durationDays === 7) return "semanal"
+  if (durationDays === 15) return "quincenal"
+  if (durationDays === 30) return "mensual"
+  return `${durationDays} días`
+}
+
+function frequencyLabel(plan: RequestablePlan): string {
+  if (plan.planType === "monthly" && plan.daysPerWeek > 0) {
+    return `${plan.daysPerWeek} clases por semana · ${periodLabel(plan.durationDays)}`
+  }
+  if (plan.totalClasses != null) return `${plan.totalClasses} clases · ${plan.durationDays} días`
+  return periodLabel(plan.durationDays)
+}
+
+export function MisPlanes(props: {
+  rows: MiPlanRow[]
+  pendingBalance: number
+  requestState: PlanRequestState
+}) {
+  const request = props.requestState
+  const blockedByDebt = request.pendingPlanDebt > 0
   const activos = props.rows.filter((r) => r.vigente)
   const pasados = props.rows.filter((r) => !r.vigente)
 
@@ -66,16 +89,49 @@ export function MisPlanes(props: { rows: MiPlanRow[]; pendingBalance: number }) 
         </div>
       ) : null}
 
+      {request.renewable != null ? (
+        <Card className="border shadow-sm">
+          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">
+                Tu {request.renewable.planName} terminó el {formatDate(request.renewable.endDate)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {request.renewable.available
+                  ? "Renuévalo para seguir reservando con tu plan, o elige otro abajo."
+                  : "Ese plan ya no está disponible; elige otro abajo."}
+              </p>
+            </div>
+            {request.renewable.available ? (
+              <div className="sm:w-48">
+                <RequestPlanButton
+                  planId={request.renewable.planId}
+                  planName={request.renewable.planName}
+                  priceMxn={
+                    request.plans.find((p) => p.id === request.renewable?.planId)?.priceMxn ?? 0
+                  }
+                  renewal
+                  disabled={blockedByDebt}
+                />
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {activos.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-card px-6 py-14 text-center">
-          <Package className="mx-auto h-8 w-8 text-muted-foreground/50" />
-          <p className="mt-3 text-sm text-muted-foreground">
-            Aún no tienes un plan o paquete contratado.
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Puedes reservar clases sueltas y el estudio te asigna un plan cuando lo contrates.
-          </p>
-        </div>
+        request.renewable == null ? (
+          <div className="rounded-xl border border-dashed bg-card px-6 py-14 text-center">
+            <Package className="mx-auto h-8 w-8 text-muted-foreground/50" />
+            <p className="mt-3 text-sm text-muted-foreground">
+              Aún no tienes un plan o paquete contratado.
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Elige uno abajo: queda activo hoy y lo pagas en el estudio. También puedes
+              reservar clases sueltas.
+            </p>
+          </div>
+        ) : null
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {activos.map((row) => (
@@ -116,6 +172,46 @@ export function MisPlanes(props: { rows: MiPlanRow[]; pendingBalance: number }) 
             </Card>
           ))}
         </div>
+      )}
+
+      {request.current == null ? (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Planes disponibles
+          </h2>
+          {blockedByDebt ? (
+            <p className="text-sm text-amber-900">
+              Para solicitar o renovar, primero paga en el estudio{" "}
+              {formatMxn(request.pendingPlanDebt)} de tu plan anterior.
+            </p>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {request.plans.map((plan) => (
+              <Card key={plan.id} className="border shadow-sm">
+                <CardContent className="flex h-full flex-col gap-3 p-5">
+                  <div>
+                    <h3 className="text-base font-semibold">{plan.name}</h3>
+                    <p className="text-sm text-muted-foreground">{frequencyLabel(plan)}</p>
+                  </div>
+                  <p className="text-lg font-semibold">{formatMxn(plan.priceMxn)}</p>
+                  <div className="mt-auto">
+                    <RequestPlanButton
+                      planId={plan.id}
+                      planName={plan.name}
+                      priceMxn={plan.priceMxn}
+                      variant="outline"
+                      disabled={blockedByDebt}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Cuando termine tu plan podrás renovarlo aquí o elegir otro.
+        </p>
       )}
 
       {pasados.length > 0 ? (

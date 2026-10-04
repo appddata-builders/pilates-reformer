@@ -27,6 +27,7 @@ function iconForType(type: string) {
   if (type === "birthday") return "🎂"
   if (type === "last_class") return "⚠"
   if (type === "plan_expiry") return "📅"
+  if (type === "plan_requested") return "🧾"
   if (type === "coach_schedule") return "📋"
   return "•"
 }

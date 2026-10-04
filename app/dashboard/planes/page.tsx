@@ -7,6 +7,7 @@ import { desc, eq } from "drizzle-orm"
 import { sortPlansByDisplayOrder } from "@/lib/site/plans"
 import { isAlumnoRole, getSessionUserId } from "@/lib/alumno-scope"
 import { getPendingBalance } from "@/lib/class-charge"
+import { getPlanRequestState } from "@/lib/plan-requests"
 import { isSubscriptionCurrent } from "@/lib/subscription-display"
 import { PlanesFormsClient } from "./planes-forms"
 import { MisPlanes, type MiPlanRow } from "./mis-planes"
@@ -56,8 +57,11 @@ export default async function PlanesPage() {
       }
     })
 
-    const pendingBalance = await getPendingBalance(db, userId)
-    return <MisPlanes rows={misPlanes} pendingBalance={pendingBalance} />
+    const [pendingBalance, requestState] = await Promise.all([
+      getPendingBalance(db, userId),
+      getPlanRequestState(db, userId),
+    ])
+    return <MisPlanes rows={misPlanes} pendingBalance={pendingBalance} requestState={requestState} />
   }
 
   const planes = await db
