@@ -206,7 +206,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
         bookingDate: schema.booking.bookingDate,
         attended: schema.booking.attended,
         studentName: schema.user.name,
-        displayId: schema.user.displayId,
+        studentEmail: schema.user.email,
         className: schema.scheduleSlot.className,
         instructor: schema.scheduleSlot.instructor,
         startTime: schema.scheduleSlot.startTime,
@@ -706,13 +706,11 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
                     badgeClass = "border-red-300 bg-red-50 text-red-800"
                   }
                   return (
-                    <TableRow key={`${row.bookingDate}-${row.displayId}-${i}`} className="border-b last:border-0">
+                    <TableRow key={`${row.bookingDate}-${row.studentEmail}-${i}`} className="border-b last:border-0">
                       <TableCell className="text-muted-foreground whitespace-nowrap">{fecha}</TableCell>
                       <TableCell className="font-medium">
                         {row.studentName}
-                        {row.displayId ? (
-                          <span className="block text-xs font-normal text-muted-foreground">{row.displayId}</span>
-                        ) : null}
+                        <span className="block text-xs font-normal text-muted-foreground">{row.studentEmail}</span>
                       </TableCell>
                       <TableCell>{row.className}</TableCell>
                       <TableCell className="text-muted-foreground">{row.instructor ?? "—"}</TableCell>

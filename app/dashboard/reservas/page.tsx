@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, count, eq, gte, lte } from "drizzle-orm"
@@ -43,10 +42,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
 
   const { start: selectedDate, end: endOfDay } = dateRangeForDay(dateStr)
 
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = session?.user?.role ?? ""
   const userId = getSessionUserId(session?.user)
   const isAlumno = isAlumnoRole(role)
@@ -150,13 +146,13 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
     }))
   }
 
-  let alumnas: { id: string; name: string; displayId: string | null }[] = []
+  let alumnas: { id: string; name: string; email: string }[] = []
   if (isAdminRoot) {
     alumnas = await db
       .select({
         id: schema.user.id,
         name: schema.user.name,
-        displayId: schema.user.displayId,
+        email: schema.user.email,
       })
       .from(schema.user)
       .where(eq(schema.user.role, "alumno"))
@@ -190,7 +186,6 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
       status: schema.booking.status,
       bookingDate: schema.booking.bookingDate,
       userName: schema.user.name,
-      displayId: schema.user.displayId,
       className: schema.scheduleSlot.className,
       startTime: schema.scheduleSlot.startTime,
       endTime: schema.scheduleSlot.endTime,
@@ -275,8 +270,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
               <option value="">Todas las alumnas</option>
               {alumnas.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name}
-                  {a.displayId ? ` (${a.displayId})` : ""}
+                  {a.name} ({a.email})
                 </option>
               ))}
             </select>
@@ -316,7 +310,6 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
                   alternateInstructor: r.alternateInstructor,
                   scheduleMode: r.scheduleMode,
                   studentName: r.userName,
-                  studentDisplayId: r.displayId,
                 }}
                 showAlumna={showAlumnaOnCard}
                 canCancel={

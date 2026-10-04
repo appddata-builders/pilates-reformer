@@ -1,9 +1,8 @@
 "use server"
 
-import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { eq } from "drizzle-orm"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { sendPaymentConfirmedNotification } from "@/lib/payment-notifications"
@@ -23,10 +22,7 @@ export async function confirmPaymentAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   if (!session || !isAdminOrRoot(session.user.role)) {
     return { success: false, error: "No autorizado" }
   }
@@ -102,10 +98,7 @@ export async function cancelPaymentAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   if (!session || !isAdminOrRoot(session.user.role)) {
     return { success: false, error: "No autorizado" }
   }

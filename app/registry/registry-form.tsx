@@ -43,18 +43,12 @@ export function RegistryForm(props: { registryToken: string }) {
       <Card className="w-full max-w-md border shadow-sm">
         <CardHeader className="space-y-1">
           <CardTitle className="text-xl">Cuenta creada</CardTitle>
-          <CardDescription>Guarda tu ID para reservar clases</CardDescription>
+          <CardDescription>Ya puedes reservar clases</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {state.displayId ? (
-            <div className="rounded-lg border bg-muted/40 px-4 py-3 text-center">
-              <p className="text-xs text-muted-foreground mb-1">Tu ID de usuario</p>
-              <p className="text-2xl font-semibold tracking-wide">{state.displayId}</p>
-            </div>
-          ) : null}
           <p className="text-sm text-muted-foreground text-center">
-            Guarda tu ID. Para entrar al panel usa tu correo o este ID con la contraseña
-            que elegiste. Tu plan lo confirma el estudio.
+            Para entrar al panel usa tu correo y la contraseña que elegiste. Tu plan lo
+            confirma el estudio.
           </p>
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
@@ -73,7 +67,7 @@ export function RegistryForm(props: { registryToken: string }) {
     <Card className="w-full max-w-md border shadow-sm">
       <CardHeader className="space-y-1">
         <CardTitle className="text-xl">Registro</CardTitle>
-        <CardDescription>Completa tus datos para obtener tu ID _TEST</CardDescription>
+        <CardDescription>Completa tus datos para crear tu cuenta</CardDescription>
       </CardHeader>
       <form action={action} className="flex flex-col gap-6">
         <input type="hidden" name="registryToken" value={props.registryToken} />

@@ -1,8 +1,7 @@
 "use server"
 
-import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import { routes } from "@/lib/routes"
 import { parseManageableRole } from "@/lib/user-role"
@@ -17,10 +16,7 @@ export async function changeUserRoleAction(
   _prev: ChangeRoleState,
   formData: FormData,
 ): Promise<ChangeRoleState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const isAdminLike =
     session != null && (session.user.role === "admin" || session.user.role === "root")
   if (!isAdminLike || session == null) {

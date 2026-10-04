@@ -1,10 +1,9 @@
 "use server"
 
 import { z } from "zod"
-import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { and, asc, eq, gte, lte } from "drizzle-orm"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import {
@@ -94,16 +93,12 @@ type SessionAlumna =
         birthdate: string | null
         role: string | null
         enabled: boolean | null
-        displayId: string | null
       }
     }
   | { ok: false; error: string }
 
 async function getSessionAlumna(): Promise<SessionAlumna> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   if (session == null) {
     return { ok: false, error: "Debes iniciar sesión para reservar" }
   }
@@ -116,7 +111,6 @@ async function getSessionAlumna(): Promise<SessionAlumna> {
       birthdate: schema.user.birthdate,
       role: schema.user.role,
       enabled: schema.user.enabled,
-      displayId: schema.user.displayId,
     })
     .from(schema.user)
     .where(eq(schema.user.id, session.user.id))
@@ -131,10 +125,6 @@ async function getSessionAlumna(): Promise<SessionAlumna> {
   if (alumna.role !== "alumno") {
     return { ok: false, error: "Esta cuenta no puede reservar clases desde aquí" }
   }
-  if (alumna.displayId == null || alumna.displayId.trim() === "") {
-    return { ok: false, error: "Tu cuenta aún no está activa. Contacta al estudio." }
-  }
-
   return { ok: true, alumna }
 }
 

@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server"
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq, desc } from "drizzle-orm"
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-      query: { disableRefresh: true },
-    })
+    const session = await getSession()
     if (!session) return NextResponse.json({ unreadCount: 0, items: [] })
 
     const db = getDb()
@@ -36,10 +32,7 @@ export async function GET() {
 
 export async function POST() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-      query: { disableRefresh: true },
-    })
+    const session = await getSession()
     if (!session) return NextResponse.json({ ok: false })
 
     const db = getDb()

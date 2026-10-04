@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { desc, eq } from "drizzle-orm"
@@ -17,10 +16,7 @@ function toDate(value: unknown): Date {
 }
 
 export default async function PlanesPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = session?.user?.role ?? ""
   const userId = getSessionUserId(session?.user)
   const db = getDb()

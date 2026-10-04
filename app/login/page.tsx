@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { routes } from "@/lib/routes"
 import { getStudioBranding } from "@/lib/studio-branding"
 import { LoginForm } from "./login-form"
@@ -14,33 +13,24 @@ type PageProps = {
 }
 
 export default async function LoginPage(props: PageProps) {
-  const [headersList, searchParams] = await Promise.all([
-    headers(),
+  const [session, searchParams] = await Promise.all([
+    getSession(),
     props.searchParams,
   ])
 
-  const session = await auth.api.getSession({
-    headers: headersList,
-    query: { disableRefresh: true },
-  })
-
-  const user = session?.user as { enabled?: boolean } | undefined
-  const accountDisabled = user != null && user.enabled === false
-
   // Sesión válida: al panel directo, sin renderizar el formulario.
-  if (user != null && !accountDisabled) {
+  // getSession ya descarta las cuentas inhabilitadas.
+  if (session != null) {
     redirect(routes.dashboard)
   }
 
   const branding = await getStudioBranding()
-  const showDisabledMsg = accountDisabled || searchParams.inhabilitado === "1"
 
   return (
     <LoginForm
       studioName={branding.studioName}
       logoUrl={branding.logoUrl}
-      accountDisabled={accountDisabled}
-      initialError={showDisabledMsg ? DISABLED_MSG : null}
+      initialError={searchParams.inhabilitado === "1" ? DISABLED_MSG : null}
     />
   )
 }

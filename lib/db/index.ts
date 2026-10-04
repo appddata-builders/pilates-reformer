@@ -50,24 +50,3 @@ export function getDb(): AppDb {
   }
   return getPgDb() as unknown as AppDb
 }
-
-export function getAuthDb(): SqliteDb | PgDb {
-  if (shouldUseSqlite() || shouldUsePgBuildFallback() || !getPgDatabaseUrl()) {
-    return getSqliteDb()
-  }
-  return getPgDb()
-}
-
-export function getAuthSchema() {
-  if (shouldUseSqlite() || shouldUsePgBuildFallback() || !getPgDatabaseUrl()) {
-    return schemaSqlite
-  }
-  return schemaPg
-}
-
-export function getAuthProvider(): "sqlite" | "pg" {
-  if (shouldUseSqlite() || shouldUsePgBuildFallback() || !getPgDatabaseUrl()) {
-    return "sqlite"
-  }
-  return "pg"
-}

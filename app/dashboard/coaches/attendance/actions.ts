@@ -1,17 +1,13 @@
 "use server"
 
-import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 
 export async function toggleAttendanceAction(formData: FormData): Promise<void> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
   if (!session || (role !== "admin" && role !== "coach")) return
 

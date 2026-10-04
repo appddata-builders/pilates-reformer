@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, eq, gte, lte } from "drizzle-orm"
@@ -64,10 +63,7 @@ function StatTile(props: {
 }
 
 export default async function CoachSchedulePage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = session?.user?.role ?? ""
   const userId = getSessionUserId(session?.user)
   const isAlumno = isAlumnoRole(role)

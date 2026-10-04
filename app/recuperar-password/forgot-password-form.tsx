@@ -34,7 +34,7 @@ export function ForgotPasswordForm(props: {
           <>
             <CardHeader className="space-y-1">
               <CardTitle className="text-xl">Revisa tu correo</CardTitle>
-              <CardDescription>Te enviamos el enlace para cambiar tu contraseña</CardDescription>
+              <CardDescription>Te enviamos un código para cambiar tu contraseña</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-center">
@@ -42,7 +42,14 @@ export function ForgotPasswordForm(props: {
               </div>
               <p className="text-sm text-muted-foreground text-center">{state.message}</p>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex flex-col gap-2">
+              <Button asChild className="w-full">
+                <Link
+                  href={`${routes.restablecerPassword}?email=${encodeURIComponent(state.email ?? "")}`}
+                >
+                  Ya tengo el código
+                </Link>
+              </Button>
               <Button asChild variant="outline" className="w-full">
                 <Link href={routes.login}>Volver a iniciar sesión</Link>
               </Button>
@@ -53,8 +60,7 @@ export function ForgotPasswordForm(props: {
             <CardHeader className="space-y-1">
               <CardTitle className="text-xl">¿Olvidaste tu contraseña?</CardTitle>
               <CardDescription>
-                Escribe tu correo o tu ID de usuario (ST) y te mandamos un enlace para
-                crear una nueva.
+                Escribe tu correo y te mandamos un código para crear una nueva.
               </CardDescription>
             </CardHeader>
             <form action={formAction} className="flex flex-col gap-6">
@@ -63,22 +69,21 @@ export function ForgotPasswordForm(props: {
                   <p className="text-sm text-destructive">{state.error}</p>
                 ) : null}
                 <div className="space-y-2">
-                  <Label htmlFor="identifier">Correo o ID</Label>
+                  <Label htmlFor="email">Correo</Label>
                   <Input
-                    id="identifier"
-                    name="identifier"
-                    type="text"
+                    id="email"
+                    name="email"
+                    type="email"
                     autoComplete="username"
-                    placeholder="correo@ejemplo.com o ST0001"
+                    placeholder="correo@ejemplo.com"
                     required
                     disabled={pending}
-                    className="font-mono"
                   />
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-3">
                 <Button className="w-full" type="submit" disabled={pending}>
-                  {pending ? "Enviando..." : "Enviar enlace"}
+                  {pending ? "Enviando..." : "Enviar código"}
                 </Button>
                 <p className="text-sm text-center text-muted-foreground">
                   <Link href={routes.login} className="text-primary hover:underline">

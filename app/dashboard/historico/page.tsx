@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, desc, eq, gte, lte } from "drizzle-orm"
@@ -31,10 +30,7 @@ function toTs(d: Date | number | unknown): Date {
 
 export default async function HistoricoPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
 
   const role = session?.user?.role ?? ""
   const sessionUserId = getSessionUserId(session?.user)
@@ -63,13 +59,13 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
 
   const db = getDb()
 
-  let alumnas: { id: string; name: string; displayId: string | null }[] = []
+  let alumnas: { id: string; name: string; email: string }[] = []
   if (isAdminRoot) {
     alumnas = await db
       .select({
         id: schema.user.id,
         name: schema.user.name,
-        displayId: schema.user.displayId,
+        email: schema.user.email,
       })
       .from(schema.user)
       .where(eq(schema.user.role, "alumno"))
@@ -100,7 +96,6 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
       alternateInstructor: schema.scheduleSlot.alternateInstructor,
       scheduleMode: schema.scheduleSlot.scheduleMode,
       studentName: schema.user.name,
-      studentDisplayId: schema.user.displayId,
     })
     .from(schema.booking)
     .innerJoin(schema.user, eq(schema.booking.userId, schema.user.id))
@@ -119,7 +114,6 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
     alternateInstructor: row.alternateInstructor,
     scheduleMode: row.scheduleMode,
     studentName: row.studentName,
-    studentDisplayId: row.studentDisplayId,
   }))
 
   const stats = countAttendanceStats(bookings)
@@ -138,7 +132,7 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
         ? (() => {
             const a = alumnas.find((x) => x.id === alumnaFilter)
             if (a == null) return "Reservas por alumna"
-            return `${a.name}${a.displayId ? ` (${a.displayId})` : ""}`
+            return `${a.name} (${a.email})`
           })()
         : `${bookings.length} reservas confirmadas en el periodo`
 
@@ -161,8 +155,7 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Se
               <option value="">Todas las alumnas</option>
               {alumnas.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name}
-                  {a.displayId ? ` (${a.displayId})` : ""}
+                  {a.name} ({a.email})
                 </option>
               ))}
             </select>

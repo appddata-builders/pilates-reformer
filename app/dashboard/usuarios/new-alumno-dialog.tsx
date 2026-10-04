@@ -101,9 +101,9 @@ export function NewAlumnoDialog(props: { planes: PlanOption[] }) {
             showStartDate
           />
           {state.error ? <p className="text-destructive text-sm">{state.error}</p> : null}
-          {state.success && state.displayId ? (
+          {state.success ? (
             <p className="text-sm text-green-700">
-              Usuario creado. ID asignado: <span className="font-mono">{state.displayId}</span>
+              Usuario creado. Entra con su correo y la contraseña temporal.
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={pending}>

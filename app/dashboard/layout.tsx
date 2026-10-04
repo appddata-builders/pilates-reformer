@@ -10,7 +10,7 @@ import {
 import { AppSidebar } from "@/components/features/admin/app-sidebar"
 import { Navbar } from "@/components/features/admin/navbar"
 import { DashboardProviders } from "@/components/features/admin/dashboard-providers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { loadNavPermissions } from "@/lib/nav-permissions.server"
 import { canAccessDashboardPath, hasNoNavAccess } from "@/lib/nav-permissions"
 import { routes } from "@/lib/routes"
@@ -28,10 +28,7 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   const headersList = await headers()
-  const session = await auth.api.getSession({
-    headers: headersList,
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   if (session == null) {
     redirect("/login")
   }
@@ -88,18 +85,10 @@ export default async function DashboardLayout({
   // Fetch welcomeShown + policy message only for alumnos — avoids unnecessary DB calls for staff
   let showWelcome = false
   let welcomeTemplate = ""
-  let welcomeDisplayId = ""
   if (isAlumno) {
-    const sessionDisplayId =
-      typeof (session.user as { displayId?: string }).displayId === "string"
-        ? (session.user as { displayId: string }).displayId.trim()
-        : ""
     const [dbUser, policyRow] = await Promise.all([
       db
-        .select({
-          welcomeShown: schema.user.welcomeShown,
-          displayId: schema.user.displayId,
-        })
+        .select({ welcomeShown: schema.user.welcomeShown })
         .from(schema.user)
         .where(eq(schema.user.id, session.user.id))
         .limit(1),
@@ -110,8 +99,6 @@ export default async function DashboardLayout({
     ])
     showWelcome = dbUser[0]?.welcomeShown === false
     welcomeTemplate = policyRow[0]?.welcomeMessage ?? ""
-    const fromDb = dbUser[0]?.displayId?.trim() ?? ""
-    welcomeDisplayId = fromDb !== "" ? fromDb : sessionDisplayId
   }
 
   // El sidebar se pinta ya con su estado real: si el valor llegara despues de
@@ -139,7 +126,6 @@ export default async function DashboardLayout({
         <WelcomeModal
           template={welcomeTemplate}
           userName={navName}
-          displayId={welcomeDisplayId}
         />
       )}
     </SidebarProvider>

@@ -15,7 +15,6 @@ export type HistoricoBookingData = {
   alternateInstructor: string | null
   scheduleMode: string | null
   studentName?: string
-  studentDisplayId?: string | null
 }
 
 function toDate(d: Date | number | unknown): Date {
@@ -44,7 +43,6 @@ export function HistoricoBookingCard(props: {
             {props.showAlumna && b.studentName ? (
               <p className="text-xs text-muted-foreground truncate mt-0.5">
                 {b.studentName}
-                {b.studentDisplayId ? ` · ${b.studentDisplayId}` : ""}
               </p>
             ) : null}
           </div>

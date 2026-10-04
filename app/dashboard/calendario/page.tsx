@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, eq, gte, lte } from "drizzle-orm"
@@ -53,10 +52,7 @@ function overlapsRange(start: Date, end: Date | null, rangeStart: Date, rangeEnd
 }
 
 export default async function CalendarioPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   if (session == null) redirect("/login")
 
   const role = session.user.role

@@ -15,14 +15,12 @@ import { markWelcomeShownAction } from "./_actions"
 export function WelcomeModal(props: {
   template: string
   userName: string
-  displayId: string
 }) {
   const [open, setOpen] = useState(true)
   const [pending, startTransition] = useTransition()
 
   const message = interpolateMessage(props.template, {
     nombre: props.userName,
-    displayId: props.displayId,
     estudio: DEFAULT_STUDIO_NAME,
     fecha: new Date().toLocaleDateString("es-MX"),
   })
@@ -46,11 +44,6 @@ export function WelcomeModal(props: {
         </DialogHeader>
         <div className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed max-h-[60vh] overflow-y-auto">
           {message}
-          {props.displayId !== "" && message.includes("{{") ? (
-            <p className="mt-3 font-medium text-foreground">
-              Tu ID de alumna es: {props.displayId}
-            </p>
-          ) : null}
         </div>
         <Button onClick={handleClose} disabled={pending} className="w-full mt-2">
           {pending ? "Guardando..." : "¡Entendido, empecemos!"}

@@ -36,22 +36,6 @@ export type CreateBookingResult =
     }
   | { ok: false; message: string }
 
-export async function findUserByDisplayId(db: AnyDb, displayIdRaw: string) {
-  const displayId = displayIdRaw.trim().toUpperCase()
-  if (!displayId) return null
-  const [row] = await db
-    .select({
-      id: schema.user.id,
-      name: schema.user.name,
-      birthdate: schema.user.birthdate,
-      role: schema.user.role,
-    })
-    .from(schema.user)
-    .where(eq(schema.user.displayId, displayId))
-    .limit(1)
-  return row ?? null
-}
-
 export async function userHasBookingForSlot(
   db: AnyDb,
   userId: string,

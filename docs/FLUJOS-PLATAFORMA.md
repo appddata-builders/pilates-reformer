@@ -14,9 +14,9 @@ flowchart TB
     LOGIN["/login — Iniciar sesión"]
   end
 
-  subgraph Auth["Better Auth"]
-    BA["Email + contraseña"]
-    SESSION["Sesión + rol + enabled"]
+  subgraph Auth["Cognito"]
+    BA["Correo + contraseña"]
+    SESSION["Tokens en cookies + rol + enabled"]
   end
 
   subgraph Dashboard["Panel /dashboard"]
@@ -104,17 +104,16 @@ flowchart LR
 sequenceDiagram
   participant A as Alumna
   participant WEB as /registry
-  participant AUTH as Better Auth
+  participant AUTH as Cognito
   participant DB as BD
   participant ST as Estudio admin
   participant DASH as Dashboard
 
   A->>WEB: Completa formulario + políticas
-  WEB->>AUTH: signUpEmail
-  AUTH->>DB: Crea user
-  WEB->>DB: Asigna rol alumno, ST, displayId
+  WEB->>AUTH: AdminCreateUser + contraseña
+  WEB->>DB: Crea user (rol alumno, cognito_id)
   WEB->>DB: Notificación bienvenida
-  WEB-->>A: Muestra ID (ej. ST0001)
+  WEB-->>A: Cuenta creada: entra con su correo
 
   Note over A,DASH: Sin plan activo aún no reserva
 
@@ -140,7 +139,7 @@ flowchart TD
   B -->|Autoregistro| C[/registry]
   B -->|Alta manual| D[Usuarios → Nuevo alumno]
 
-  C --> E[Usuario + ID ST]
+  C --> E[Usuario en Cognito + BD]
   D --> E
 
   E --> F[Planes → catálogo de planes]
@@ -154,7 +153,7 @@ flowchart TD
   K --> M[(payment paid)]
 
   H --> N[Clases → Horario semanal]
-  N --> O[Reservas → Nueva reserva por displayId]
+  N --> O[Alumna reserva en /agendar]
   O --> P[(booking confirmed)]
   P --> Q[Coach → Asistencia]
   P --> R[Histórico / Reportes]
@@ -259,18 +258,10 @@ flowchart LR
 
 ---
 
-## 7. IDs de usuario (ST)
+## 7. Identidad de usuario
 
-```mermaid
-flowchart TD
-  REG[/registry o Usuarios] --> ST["ST0001, ST0002…"]
-  ST --> RES[Reservas / login panel]
-  PLAN[Plan class_pack / monthly] --> ST
-```
-
-| Prefijo | Tipo | Ejemplo |
-|---------|------|---------|
-| **ST** | Alumno | ST0001, ST0002 |
+No hay IDs de usuario propios del estudio (los ST se retiraron). Cada persona
+es su correo en Cognito; la base la liga por `user.cognito_id` (el `sub`).
 
 ---
 
@@ -285,7 +276,6 @@ flowchart TD
 | Suscripciones, pagos, reservas, devoluciones | ✅ |
 | Reportes, calendario, config, permisos nav | ✅ |
 | Reserva pública `/agendar` | ❌ no implementada |
-| Login por ID (solo email hoy) | ⚠️ parcial |
 
 ---
 

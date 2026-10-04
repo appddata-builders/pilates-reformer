@@ -28,8 +28,6 @@ export type UsuarioTableRow = {
   phone: string | null
   notes: string | null
   birthdate: string | null
-  displayId: string | null
-  displayLabel: string
   enabled: boolean
   planId: string
   billingCycle: string
@@ -55,13 +53,11 @@ function subscriptionColumnBadge(hasSubscription: boolean, userEnabled: boolean)
 }
 
 function rowMatchesSearch(row: UsuarioTableRow, query: string) {
-  const id = row.displayLabel.toLowerCase()
   const name = row.name.toLowerCase()
   const email = row.email.toLowerCase()
   const plan = (row.planName ?? "").toLowerCase()
   const phone = (row.phone ?? "").toLowerCase()
   return (
-    id.includes(query) ||
     name.includes(query) ||
     email.includes(query) ||
     plan.includes(query) ||
@@ -69,7 +65,7 @@ function rowMatchesSearch(row: UsuarioTableRow, query: string) {
   )
 }
 
-const ALUMNOS_DEFAULT_SORT = "displayId"
+const ALUMNOS_DEFAULT_SORT = "name"
 
 export function UsuariosTable(props: {
   rows: UsuarioTableRow[]
@@ -82,7 +78,7 @@ export function UsuariosTable(props: {
   const [searchQuery, setSearchQuery] = useState("")
   const q = searchQuery.trim().toLowerCase()
   const visibleRows = q === "" ? props.rows : props.rows.filter((row) => rowMatchesSearch(row, q))
-  const columnCount = props.canManage ? 10 : 9
+  const columnCount = props.canManage ? 9 : 8
 
   return (
     <div data-tour="page-table" className="rounded-lg border bg-card">
@@ -93,7 +89,7 @@ export function UsuariosTable(props: {
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nombre, correo, ID, teléfono o plan…"
+            placeholder="Buscar por nombre, correo, teléfono o plan…"
             className="pl-9"
             aria-label="Buscar alumnas"
           />
@@ -107,14 +103,6 @@ export function UsuariosTable(props: {
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent border-b">
-            <SortableTableHead
-              className="text-muted-foreground font-normal text-sm"
-              href={buildSortHref(routes.usuarios, props.sort, "displayId", props.dir, props.sortQuery, { sort: ALUMNOS_DEFAULT_SORT, dir: "asc" })}
-              active={props.sort === "displayId"}
-              dir={props.dir}
-            >
-              ID
-            </SortableTableHead>
             <SortableTableHead
               className="text-muted-foreground font-normal text-sm"
               href={buildSortHref(routes.usuarios, props.sort, "name", props.dir, props.sortQuery, { sort: ALUMNOS_DEFAULT_SORT, dir: "asc" })}
@@ -163,14 +151,6 @@ export function UsuariosTable(props: {
                 key={row.id}
                 className={`border-b last:border-0 ${!row.enabled ? "opacity-60" : ""}`}
               >
-                <TableCell className="text-muted-foreground text-sm font-mono">
-                  <Link
-                    className="underline underline-offset-2 hover:text-foreground"
-                    href={routes.usuarioDetail(row.id)}
-                  >
-                    {row.displayLabel}
-                  </Link>
-                </TableCell>
                 <TableCell className="font-medium">
                   <Link className="hover:underline" href={routes.usuarioDetail(row.id)}>
                     {row.name}
@@ -214,7 +194,6 @@ export function UsuariosTable(props: {
                         phone: row.phone,
                         notes: row.notes,
                         birthdate: row.birthdate,
-                        displayId: row.displayId,
                         planId: row.planId,
                         billingCycle: row.billingCycle,
                         enabled: row.enabled,

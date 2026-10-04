@@ -45,7 +45,6 @@ export type AlumnoRowData = {
   phone: string | null
   birthdate: string | null
   notes: string | null
-  displayId: string | null
   planId: string
   billingCycle: string
   enabled: boolean
@@ -81,7 +80,7 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
     }
   }, [toggleState.success])
 
-  const displayLabel = props.alumno.displayId ?? props.alumno.name
+  const displayLabel = props.alumno.name
   const isEnabled = props.alumno.enabled !== false
 
   return (
@@ -283,7 +282,7 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
           <AlertDialogHeader>
             <AlertDialogTitle>¿Borrar este usuario?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará el registro de {displayLabel} ({props.alumno.name}), incluyendo
+              Se eliminará el registro de {displayLabel} ({props.alumno.email}), incluyendo
               reservas, pagos y planes asociados. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>

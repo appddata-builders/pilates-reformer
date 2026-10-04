@@ -264,7 +264,6 @@ export function ConfigFormsClient(props: {
                       <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-secondary-foreground">{"{{plan}}"}</span>
                       <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-secondary-foreground">{"{{estudio}}"}</span>
                       <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-secondary-foreground">{"{{fecha}}"}</span>
-                      <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-secondary-foreground">{"{{displayId}}"}</span>
                     </div>
                   </div>
                   <div className="p-4">

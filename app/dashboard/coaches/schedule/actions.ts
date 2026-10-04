@@ -1,7 +1,6 @@
 "use server"
 
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, eq, gte, lte } from "drizzle-orm"
@@ -10,7 +9,6 @@ import { dateRangeForDay } from "@/lib/booking-slot-options"
 export type SlotRosterStudent = {
   bookingId: string
   name: string
-  displayId: string | null
   phone: string | null
   attended: boolean | null
 }
@@ -30,10 +28,7 @@ export async function getSlotRosterAction(
   scheduleSlotId: string,
   bookingDateStr: string,
 ): Promise<SlotRoster> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
   if (!session || (role !== "admin" && role !== "root" && role !== "coach")) {
     return { ok: false, error: "No autorizado" }
@@ -58,7 +53,6 @@ export async function getSlotRosterAction(
     .select({
       bookingId: schema.booking.id,
       name: schema.user.name,
-      displayId: schema.user.displayId,
       phone: schema.user.phone,
       attended: schema.booking.attended,
     })

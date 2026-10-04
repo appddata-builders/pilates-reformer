@@ -34,71 +34,22 @@ export const user = pgTable("user", {
   image: text("image"),
   role: text("role").notNull().default("alumno"),
   phone: text("phone"),
-  displayId: text("display_id").unique(),
-  idPrefix: text("id_prefix").notNull().default("ST"),
   birthdate: text("birthdate"),
   notes: text("notes"),
   enabled: boolean("enabled").notNull().default(true),
+  // `sub` del usuario en Cognito, donde viven las contraseñas. Se guarda al
+  // dar de alta la cuenta (lib/user-accounts.ts) y la sesión se busca por él,
+  // como `usuario.cognitoid` en refautomex. No hay usuario sin cuenta de Cognito.
+  cognitoId: text("cognito_id").notNull().unique(),
+  // Los ID tokens emitidos antes de esta fecha ya no abren sesión: así se
+  // "cierran todas las sesiones" al inhabilitar o cambiar la contraseña.
+  sessionsRevokedAt: timestamp("sessions_revoked_at", { precision: 3, mode: "date" }),
   welcomeShown: boolean("welcome_shown").notNull().default(false),
   // Clase muestra: se redime una sola vez por cuenta y no genera cobro.
   trialClassUsedAt: timestamp("trial_class_used_at", { precision: 3, mode: "date" }),
   createdAt: timestamp("created_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
 })
-
-export const session = pgTable(
-  "session",
-  {
-    id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at", { precision: 3, mode: "date" }).notNull(),
-    token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  },
-  (t) => [index("session_userId_idx").on(t.userId)],
-)
-
-export const account = pgTable(
-  "account",
-  {
-    id: text("id").primaryKey(),
-    accountId: text("account_id").notNull(),
-    providerId: text("provider_id").notNull(),
-    // better-auth >= 1.5 identifica la cuenta por (issuer, account_id); para
-    // email/contraseña el valor es createLocalAccountIssuer("credential").
-    issuer: text("issuer").notNull(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token"),
-    idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at", { precision: 3, mode: "date" }),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { precision: 3, mode: "date" }),
-    scope: text("scope"),
-    password: text("password"),
-    createdAt: timestamp("created_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("account_userId_idx").on(t.userId),
-    uniqueIndex("account_issuer_account_id_uidx").on(t.issuer, t.accountId),
-  ],
-)
-
-export const verification = pgTable(
-  "verification",
-  {
-    id: text("id").primaryKey(),
-    identifier: text("identifier").notNull(),
-    value: text("value").notNull(),
-    expiresAt: timestamp("expires_at", { precision: 3, mode: "date" }).notNull(),
-    createdAt: timestamp("created_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { precision: 3, mode: "date" }).notNull().defaultNow(),
-  },
-  (t) => [index("verification_identifier_idx").on(t.identifier)],
-)
 
 export const plan = pgTable("plan", {
   id: text("id").primaryKey(),
@@ -294,7 +245,7 @@ export const studioPolicy = pgTable("studio_policy", {
   alertLastClassThreshold: integer("alert_last_class_threshold").notNull().default(2),
   alertDaysBeforeExpiry: integer("alert_days_before_expiry").notNull().default(3),
   welcomeMessage: text("welcome_message").notNull().default(
-    "Bienvenid@ {{nombre}}.\n\nTu ID es: {{displayId}}\n\n¡Nos vemos en el estudio!",
+    "Bienvenid@ {{nombre}}.\n\nPara entrar al panel usa tu correo y tu contraseña.\n\n¡Nos vemos en el estudio!",
   ),
   birthdayMessage: text("birthday_message").notNull().default(
     "¡Feliz cumpleaños {{nombre}}! El equipo de {{estudio}} te desea un día increíble.",
@@ -339,8 +290,6 @@ export const notification = pgTable("notification", {
 })
 
 export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
   subscriptions: many(subscription),
   bookings: many(booking),
   payments: many(payment),
@@ -348,14 +297,6 @@ export const userRelations = relations(user, ({ many }) => ({
   studioEvents: many(studioEvent, { relationName: "relatedEvents" }),
   sales: many(saleItem),
   payrollPeriods: many(coachPayrollPeriod),
-}))
-
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, { fields: [session.userId], references: [user.id] }),
-}))
-
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, { fields: [account.userId], references: [user.id] }),
 }))
 
 export const planRelations = relations(plan, ({ many }) => ({

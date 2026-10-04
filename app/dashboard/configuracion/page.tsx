@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -10,10 +9,7 @@ import { ConfigFormsClient } from "./config-forms"
 import { parseNavPermissionsJson } from "@/lib/nav-permissions"
 
 export default async function ConfiguracionPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   if (session == null) redirect("/login")
 
   const role = session.user.role

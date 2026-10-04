@@ -1,9 +1,8 @@
 "use server"
 
 import { z } from "zod"
-import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -81,10 +80,7 @@ export async function createSlotAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
   if (!session || !canManageClases(role)) {
     return { success: false, error: "No autorizado" }
@@ -117,10 +113,7 @@ export async function updateSlotAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
   if (!session || !canManageClases(role)) {
     return { success: false, error: "No autorizado" }
@@ -159,10 +152,7 @@ export async function deleteSlotAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
   if (!session || !canManageClases(role)) {
     return { success: false, error: "No autorizado" }
@@ -185,10 +175,7 @@ export async function toggleSlotAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
   if (!session || !canManageClases(role)) {
     return { success: false, error: "No autorizado" }
@@ -214,10 +201,7 @@ export async function setSlotWeekAvailabilityAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
   if (!session || !canManageClases(role)) {
     return { success: false, error: "No autorizado" }

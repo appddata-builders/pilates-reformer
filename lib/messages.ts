@@ -11,7 +11,6 @@ export function interpolateMessage(
     plan?: string
     estudio?: string
     fecha?: string
-    displayId?: string
     monto?: string
     concepto?: string
     metodo?: string
@@ -22,7 +21,8 @@ export function interpolateMessage(
   out = replaceToken(out, "plan", ctx.plan ?? "")
   out = replaceToken(out, "estudio", ctx.estudio ?? "")
   out = replaceToken(out, "fecha", ctx.fecha ?? "")
-  out = replaceToken(out, "displayId", ctx.displayId ?? "")
+  // El ID ST ya no existe; las plantillas guardadas antes pueden traer el token.
+  out = replaceToken(out, "displayId", "")
   out = replaceToken(out, "monto", ctx.monto ?? "")
   out = replaceToken(out, "concepto", ctx.concepto ?? "")
   out = replaceToken(out, "metodo", ctx.metodo ?? "")

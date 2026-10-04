@@ -18,10 +18,10 @@
     "db:pg:seed": "psql \"%DATABASE_URL%\" -f scripts/postgres-manual/03-seed-fake.sql",
     "db:pg:reset": "tsx --env-file=.env.local scripts/db-reset.ts",
     "db:reset:local": "tsx --env-file=.env.local scripts/db-reset.ts --sqlite",
-    "seed:hydrate": "node scripts/seed-hydrate.mjs",
-    "email:test": "tsx --env-file=.env.local scripts/email-test.ts"
+    "seed:hydrate": "node scripts/seed-hydrate.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1146.0",
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/daygrid": "^6.1.20",
     "@fullcalendar/interaction": "^6.1.20",
@@ -56,8 +56,7 @@
     "@radix-ui/react-toggle": "1.1.10",
     "@radix-ui/react-toggle-group": "1.1.11",
     "@radix-ui/react-tooltip": "1.2.8",
-    "@types/nodemailer": "^8.0.1",
-    "better-auth": "^1.7.1",
+    "aws-jwt-verify": "^5.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
@@ -70,7 +69,6 @@
     "lucide-react": "^0.564.0",
     "next": "^16.2.9",
     "next-themes": "^0.4.6",
-    "nodemailer": "^9.0.5",
     "postgres": "^3.4.8",
     "react": "19.2.3",
     "react-day-picker": "9.13.2",

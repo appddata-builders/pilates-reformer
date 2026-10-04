@@ -1,11 +1,10 @@
 import Image from "next/image"
 import Link from "next/link"
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { AgendarScreen } from "@/components/agendar-screen"
 import { AccountNavLink } from "@/components/features/site/account-nav-link"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { siteLogo } from "@/lib/site/routes"
 import { getStudioBranding } from "@/lib/studio-branding"
 import { getServerT } from "@/lib/text/server-text"
@@ -21,10 +20,7 @@ export default async function AgendarPage({
     searchParams,
     getServerT(),
     getStudioBranding(),
-    auth.api.getSession({
-      headers: await headers(),
-      query: { disableRefresh: true },
-    }),
+    getSession(),
   ])
 
   if (params.slot && session?.user == null) redirect("/login")

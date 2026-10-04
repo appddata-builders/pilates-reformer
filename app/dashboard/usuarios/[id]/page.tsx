@@ -1,9 +1,8 @@
 export const dynamic = "force-dynamic"
 
 import Link from "next/link"
-import { headers } from "next/headers"
 import { notFound } from "next/navigation"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { PageHeader } from "@/components/features/admin/page-header"
@@ -38,10 +37,7 @@ export default async function AlumnoDetailPage(props: { params: Promise<{ id: st
   const db = getDb()
 
   // Confirmar cobros es de admin y root, no de un coach que llegue a la ficha.
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const sessionRole = session?.user.role ?? ""
   const canManage = sessionRole === "admin" || sessionRole === "root"
 
@@ -165,8 +161,8 @@ export default async function AlumnoDetailPage(props: { params: Promise<{ id: st
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">ID</span>
-              <span className="font-mono">{alumno.displayId ?? "—"}</span>
+              <span className="text-muted-foreground">Correo</span>
+              <span>{alumno.email}</span>
             </div>
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Rol</span>

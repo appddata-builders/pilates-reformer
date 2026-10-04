@@ -18,7 +18,7 @@ const initial: ResetPasswordState = { success: false }
 export function ResetPasswordForm(props: {
   studioName: string
   logoUrl: string | null
-  token: string
+  email: string
 }) {
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [state, formAction, pending] = useActionState(resetPasswordAction, initial)
@@ -53,14 +53,50 @@ export function ResetPasswordForm(props: {
           <>
             <CardHeader className="space-y-1">
               <CardTitle className="text-xl">Crea tu nueva contraseña</CardTitle>
-              <CardDescription>Mínimo 8 caracteres, con letras y números</CardDescription>
+              <CardDescription>
+                Escribe el código que te llegó de no-reply@verificationemail.com. La
+                contraseña lleva mínimo 8 caracteres, con letras y números.
+              </CardDescription>
             </CardHeader>
             <form action={formAction} className="flex flex-col gap-6">
-              <input type="hidden" name="token" value={props.token} />
               <CardContent className="space-y-4">
                 {state.error ? (
                   <p className="text-sm text-destructive">{state.error}</p>
                 ) : null}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Correo</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="username"
+                    defaultValue={props.email}
+                    placeholder="correo@ejemplo.com"
+                    required
+                    disabled={pending}
+                  />
+                  {state.fieldErrors?.email ? (
+                    <p className="text-destructive text-sm">{state.fieldErrors.email[0]}</p>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="code">Código</Label>
+                  <Input
+                    id="code"
+                    name="code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="123456"
+                    required
+                    maxLength={10}
+                    disabled={pending}
+                    className="font-mono tracking-widest"
+                  />
+                  {state.fieldErrors?.code ? (
+                    <p className="text-destructive text-sm">{state.fieldErrors.code[0]}</p>
+                  ) : null}
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Nueva contraseña</Label>
                   <div className="relative">
@@ -117,6 +153,10 @@ export function ResetPasswordForm(props: {
                   {pending ? "Guardando..." : "Cambiar contraseña"}
                 </Button>
                 <p className="text-sm text-center text-muted-foreground">
+                  <Link href={routes.recuperarPassword} className="text-primary hover:underline">
+                    Pedir otro código
+                  </Link>
+                  {" · "}
                   <Link href={routes.login} className="text-primary hover:underline">
                     Volver a iniciar sesión
                   </Link>

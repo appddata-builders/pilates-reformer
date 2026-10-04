@@ -1,5 +1,4 @@
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import { hasUsedTrialClass } from "@/lib/class-charge"
 import { loadReservacionesPlans } from "@/lib/site/public-plans.server"
@@ -9,10 +8,7 @@ import { HomePage } from "./home-page"
 export default async function Page() {
   const [plans, session, board] = await Promise.all([
     loadReservacionesPlans(),
-    auth.api.getSession({
-      headers: await headers(),
-      query: { disableRefresh: true },
-    }),
+    getSession(),
     loadLandingScheduleBoard(),
   ])
 

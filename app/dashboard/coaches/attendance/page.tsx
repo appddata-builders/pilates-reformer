@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, eq, gte, lte } from "drizzle-orm"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { PageHeader } from "@/components/features/admin/page-header"
 import { Badge } from "@/components/shared/ui/badge"
 import { Button } from "@/components/shared/ui/button"
@@ -21,10 +20,7 @@ export default async function CoachAttendancePage({
   searchParams: SearchParams
 }) {
   const params = await searchParams
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = typeof session?.user?.role === "string" ? session.user.role : ""
   const coachName =
     typeof session?.user?.name === "string" ? session.user.name.trim() : ""
@@ -49,7 +45,6 @@ export default async function CoachAttendancePage({
       attended: schema.booking.attended,
       countedAsAttended: schema.booking.countedAsAttended,
       studentName: schema.user.name,
-      studentDisplayId: schema.user.displayId,
       studentEmail: schema.user.email,
       slotId: schema.scheduleSlot.id,
       className: schema.scheduleSlot.className,
@@ -169,7 +164,6 @@ export default async function CoachAttendancePage({
                     <div>
                       <p className="text-sm font-medium">{b.studentName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {b.studentDisplayId ? `${b.studentDisplayId} · ` : ""}
                         {b.studentEmail}
                       </p>
                     </div>

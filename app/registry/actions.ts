@@ -1,20 +1,16 @@
 "use server"
 
-import { auth } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
-import { generateDisplayId } from "@/lib/display-id"
 import { normalizeBirthdateInput } from "@/lib/birthdate"
-import {
-  USER_ID_PREFIX_REGULAR,
-  parseUserIdPrefix,
-} from "@/lib/id-prefix"
 import {
   REGISTRY_EMAIL_FIELD_ERROR,
   REGISTRY_GENERIC_ERROR,
 } from "@/lib/registry-errors"
 import { sendWelcomeNotification } from "@/lib/welcome-message"
+import { CognitoPasswordError, EmailTakenError } from "@/lib/cognito"
+import { createUserAccount } from "@/lib/user-accounts"
 import {
   canAccessHiddenRegistry,
   hiddenRegistrySchema,
@@ -28,7 +24,6 @@ export type RegistryActionState = {
   success: boolean
   error?: string
   fieldErrors?: Record<string, string[]>
-  displayId?: string
 }
 
 function getRegistryTokenFromForm(formData: FormData): string | undefined {
@@ -49,7 +44,7 @@ export async function hiddenRegistryAction(
 
   const honeypot = formData.get("company")
   if (typeof honeypot === "string" && honeypot.trim() !== "") {
-    return { success: true, displayId: `${USER_ID_PREFIX_REGULAR}0000` }
+    return { success: true }
   }
 
   if (!isRegistryPolicyComplete(formData)) {
@@ -58,8 +53,6 @@ export async function hiddenRegistryAction(
       error: "Debes descargar el acuerdo y aceptar las políticas para registrarte",
     }
   }
-
-  const idPrefix = parseUserIdPrefix(formData.get("idPrefix"))
 
   const parsed = hiddenRegistrySchema.safeParse({
     name: formData.get("name"),
@@ -105,7 +98,7 @@ export async function hiddenRegistryAction(
   const db = getDb()
 
   const [emailTaken] = await db
-    .select({ id: schema.user.id, displayId: schema.user.displayId })
+    .select({ id: schema.user.id })
     .from(schema.user)
     .where(eq(schema.user.email, email))
     .limit(1)
@@ -118,78 +111,41 @@ export async function hiddenRegistryAction(
   }
 
   try {
-    await auth.api.signUpEmail({
-      body: {
-        name,
-        email,
-        password: parsed.data.password,
-      },
+    const created = await createUserAccount(db, {
+      name,
+      email,
+      password: parsed.data.password,
+      role: "alumno",
+      phone,
+      birthdate: birthdateIso,
     })
 
-    const [created] = await db
-      .select({ id: schema.user.id, displayId: schema.user.displayId })
-      .from(schema.user)
-      .where(eq(schema.user.email, email))
+    const [policy] = await db
+      .select({ studioName: schema.studioPolicy.studioName })
+      .from(schema.studioPolicy)
+      .where(eq(schema.studioPolicy.id, "main"))
       .limit(1)
 
-    if (created == null) {
-      return { success: false, error: REGISTRY_GENERIC_ERROR }
-    }
+    await sendWelcomeNotification({
+      userId: created.id,
+      nombre: name,
+      phone,
+      estudio: policy?.studioName ?? "Pilates Studio",
+    })
 
-    if (created.displayId != null && created.displayId.trim() !== "") {
+    return { success: true }
+  } catch (e) {
+    if (e instanceof EmailTakenError) {
       return {
         success: false,
         fieldErrors: { email: [REGISTRY_EMAIL_FIELD_ERROR] },
       }
     }
-
-    const displayId = await generateDisplayId(db, idPrefix)
-
-    await db
-      .update(schema.user)
-      .set({
-        role: "alumno",
-        phone,
-        displayId,
-        birthdate: birthdateIso,
-        enabled: true,
-        emailVerified: true,
-        idPrefix,
-      })
-      .where(eq(schema.user.id, created.id))
-
-    const [accountRow] = await db
-      .select({ id: schema.account.id, password: schema.account.password })
-      .from(schema.account)
-      .where(eq(schema.account.userId, created.id))
-      .limit(1)
-
-    if (accountRow == null || accountRow.password == null || accountRow.password.trim() === "") {
-      return { success: false, error: REGISTRY_GENERIC_ERROR }
+    if (e instanceof CognitoPasswordError) {
+      return { success: false, fieldErrors: { password: [e.message] } }
     }
-
-    const row = created
-
-    if (row != null) {
-      const [policy] = await db
-        .select({ studioName: schema.studioPolicy.studioName })
-        .from(schema.studioPolicy)
-        .where(eq(schema.studioPolicy.id, "main"))
-        .limit(1)
-
-      await sendWelcomeNotification({
-        userId: row.id,
-        nombre: name,
-        displayId,
-        phone,
-        estudio: policy?.studioName ?? "Pilates Studio",
-      })
-    }
-
-    return { success: true, displayId }
-  } catch (e) {
     const msg = e instanceof Error ? e.message : ""
-    if (msg.toLowerCase().includes("exists") || msg.toLowerCase().includes("unique")) {
+    if (msg.toLowerCase().includes("unique")) {
       return {
         success: false,
         fieldErrors: { email: [REGISTRY_EMAIL_FIELD_ERROR] },

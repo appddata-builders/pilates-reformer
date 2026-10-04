@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/shared/ui/button"
@@ -12,7 +12,7 @@ import {
 import { LoginLoadingOverlay } from "@/components/features/login/login-loading-overlay"
 import { DashboardBrand } from "@/components/features/admin/dashboard-brand"
 import { authClient } from "@/lib/auth-client"
-import { signInByDisplayId } from "@/lib/sign-in-by-display-id"
+import { signInWithEmail } from "@/lib/sign-in"
 import { routes } from "@/lib/routes"
 
 const CONNECTION_ERROR_MSG = "Problemas de conexión. Vuelva a intentar más tarde."
@@ -30,10 +30,9 @@ async function waitForSessionUser() {
 export function LoginForm(props: {
   studioName: string
   logoUrl: string | null
-  accountDisabled: boolean
   initialError: string | null
 }) {
-  const [identifier, setIdentifier] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [overlayActive, setOverlayActive] = useState(false)
@@ -53,19 +52,12 @@ export function LoginForm(props: {
     setErrorMsg(CONNECTION_ERROR_MSG)
   }, [])
 
-  // La sesión ya se validó en el servidor: acá sólo limpiamos la cookie
-  // de una cuenta inhabilitada para que no quede colgada.
-  useEffect(() => {
-    if (!props.accountDisabled) return
-    void authClient.signOut()
-  }, [props.accountDisabled])
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErrorMsg(null)
     setOverlayActive(true)
 
-    const signIn = await signInByDisplayId(identifier, password)
+    const signIn = await signInWithEmail(email, password)
     if (!signIn.ok) {
       setOverlayActive(false)
       setErrorMsg(signIn.error)
@@ -104,24 +96,23 @@ export function LoginForm(props: {
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl">Iniciar sesión</CardTitle>
             <CardDescription>
-              Usa tu correo o tu ID de usuario (ST) y tu contraseña
+              Usa tu correo y tu contraseña
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <CardContent className="space-y-4">
               {errorMsg ? <p className="text-sm text-destructive">{errorMsg}</p> : null}
               <div className="space-y-2">
-                <Label htmlFor="identifier">Correo o ID</Label>
+                <Label htmlFor="email">Correo</Label>
                 <Input
-                  id="identifier"
-                  type="text"
+                  id="email"
+                  type="email"
                   autoComplete="username"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="correo@ejemplo.com o ST0001"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="correo@ejemplo.com"
                   required
                   disabled={overlayActive}
-                  className="font-mono"
                 />
               </div>
               <div className="space-y-2">

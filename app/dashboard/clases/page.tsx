@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq, and, gte, lte, asc } from "drizzle-orm"
@@ -13,10 +12,7 @@ import { getMondayOfWeek } from "@/lib/site/schedule"
 import { ClasesClient } from "./clases-client"
 import type { SlotCardData } from "./slot-card"
 export default async function ClasesPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const role = session?.user?.role ?? ""
   const hideInstructor = hidesInstructorAssignment(role)
   const canManage = role === "admin" || role === "root"

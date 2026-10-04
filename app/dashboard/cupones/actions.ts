@@ -1,10 +1,9 @@
 "use server"
 
 import { z } from "zod"
-import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { eq } from "drizzle-orm"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { normalizeCouponCode } from "@/lib/coupon-pricing"
@@ -16,10 +15,7 @@ export type ActionState = {
 }
 
 async function assertStaff() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const ok =
     session != null &&
     (session.user.role === "admin" || session.user.role === "root")

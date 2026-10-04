@@ -1,11 +1,6 @@
 "use server"
 
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
-import {
-  PASSWORD_RESET_INVALID_TOKEN_MESSAGE,
-  newPasswordSchema,
-} from "@/lib/password-reset"
+import { newPasswordSchema, resetPasswordWithCode } from "@/lib/password-reset"
 
 export type ResetPasswordState = {
   success: boolean
@@ -17,15 +12,26 @@ export async function resetPasswordAction(
   _prev: ResetPasswordState,
   formData: FormData,
 ): Promise<ResetPasswordState> {
-  const token = formData.get("token")
-  if (typeof token !== "string" || token.trim() === "") {
-    return { success: false, error: PASSWORD_RESET_INVALID_TOKEN_MESSAGE }
-  }
-
+  const email = formData.get("email")
+  const code = formData.get("code")
   const password = formData.get("password")
   const confirmPassword = formData.get("confirmPassword")
-  if (typeof password !== "string" || typeof confirmPassword !== "string") {
+  if (
+    typeof email !== "string" ||
+    typeof code !== "string" ||
+    typeof password !== "string" ||
+    typeof confirmPassword !== "string"
+  ) {
     return { success: false, error: "Datos incompletos" }
+  }
+
+  if (email.trim() === "") {
+    return { success: false, fieldErrors: { email: ["Escribe tu correo"] } }
+  }
+
+  const cleanCode = code.replace(/\s+/g, "")
+  if (cleanCode === "") {
+    return { success: false, fieldErrors: { code: ["Escribe el código que te llegó por correo"] } }
   }
 
   const parsed = newPasswordSchema.safeParse(password)
@@ -44,13 +50,14 @@ export async function resetPasswordAction(
   }
 
   try {
-    await auth.api.resetPassword({
-      body: { token: token.trim(), newPassword: password },
-      headers: await headers(),
-    })
-    return { success: true }
+    const result = await resetPasswordWithCode(email, cleanCode, password)
+    if (result.ok) return { success: true }
+    if (result.field != null) {
+      return { success: false, fieldErrors: { [result.field]: [result.error] } }
+    }
+    return { success: false, error: result.error }
   } catch (e) {
     console.error("[password-reset] Falló el cambio de contraseña:", e)
-    return { success: false, error: PASSWORD_RESET_INVALID_TOKEN_MESSAGE }
+    return { success: false, error: "Problemas de conexión. Vuelva a intentar más tarde." }
   }
 }

@@ -17,7 +17,6 @@ export type ReservaCardData = {
   alternateInstructor: string | null
   scheduleMode: string | null
   studentName?: string
-  studentDisplayId?: string | null
 }
 
 function statusBadge(status: string) {
@@ -67,7 +66,6 @@ export function ReservaCard(props: {
             {props.showAlumna && r.studentName ? (
               <p className="text-xs text-muted-foreground truncate mt-0.5">
                 {r.studentName}
-                {r.studentDisplayId ? ` · ${r.studentDisplayId}` : ""}
               </p>
             ) : null}
           </div>

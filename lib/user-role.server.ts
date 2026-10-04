@@ -1,8 +1,6 @@
 import type { AnyDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
-import { generateDisplayId } from "@/lib/display-id"
-import { USER_ID_PREFIX_REGULAR } from "@/lib/id-prefix"
 import { createNotification } from "@/lib/notifications"
 import { ALUMNO_ROLE_LABEL, parseManageableRole, type ManageableRole } from "@/lib/user-role"
 
@@ -20,7 +18,6 @@ export async function changeUserRole(
       id: schema.user.id,
       name: schema.user.name,
       role: schema.user.role,
-      displayId: schema.user.displayId,
     })
     .from(schema.user)
     .where(eq(schema.user.id, params.userId))
@@ -54,14 +51,9 @@ export async function changeUserRole(
       .set({ alternateInstructor: null })
       .where(eq(schema.scheduleSlot.alternateInstructor, existing.name))
 
-    const hasDisplayId = existing.displayId != null && existing.displayId.trim() !== ""
-    const displayId = hasDisplayId
-      ? existing.displayId
-      : await generateDisplayId(db, USER_ID_PREFIX_REGULAR)
-
     await db
       .update(schema.user)
-      .set({ role: "alumno", displayId, idPrefix: USER_ID_PREFIX_REGULAR })
+      .set({ role: "alumno" })
       .where(eq(schema.user.id, existing.id))
   }
 
@@ -72,7 +64,7 @@ export async function changeUserRole(
     body:
       params.nextRole === "coach"
         ? "El estudio te asignó el rol de Coach. Al entrar al panel verás las secciones de coach."
-        : `El estudio te asignó el rol de ${ALUMNO_ROLE_LABEL}. Ya puedes reservar clases con tu ID de usuario.`,
+        : `El estudio te asignó el rol de ${ALUMNO_ROLE_LABEL}. Ya puedes reservar clases desde el panel.`,
   })
 
   return { ok: true, role: params.nextRole }

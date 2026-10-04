@@ -23,7 +23,7 @@ function describeChange(nextRole: ManageableRole, userLabel: string): string {
   if (nextRole === "coach") {
     return `${userLabel} pasará a ser Coach y dejará de aparecer en la lista de usuarios. Sus reservas y planes se conservan.`
   }
-  return `${userLabel} pasará a ser ${manageableRoleLabel("alumno")} y se liberarán los horarios donde figura como instructor. Si no tenía ID de usuario, se le asignará uno.`
+  return `${userLabel} pasará a ser ${manageableRoleLabel("alumno")} y se liberarán los horarios donde figura como instructor.`
 }
 
 export function ChangeRoleControl(props: {

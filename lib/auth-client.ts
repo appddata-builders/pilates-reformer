@@ -1,18 +1,85 @@
-import { createAuthClient } from "better-auth/react"
+"use client"
 
-let base = ""
-if (typeof window !== "undefined") {
-  base = window.location.origin
-} else {
-  const u = process.env.NEXT_PUBLIC_BETTER_AUTH_URL
-  if (u != null && u !== "") {
-    base = u
+import { useEffect, useSyncExternalStore } from "react"
+
+/**
+ * Sesión del lado del navegador. Las cookies de Cognito son httpOnly, así que
+ * se pregunta al servidor (app/api/auth/session). Conserva la forma del
+ * cliente de better-auth que usaban los componentes: useSession, getSession y
+ * signOut.
+ */
+
+export type ClientSessionUser = {
+  id: string
+  name: string
+  email: string
+  role: string
+  enabled: boolean
+  image: string | null
+}
+
+type SessionData = { user: ClientSessionUser } | null
+type SessionState = { data: SessionData; isPending: boolean }
+
+const PENDING: SessionState = { data: null, isPending: true }
+
+// Un solo estado compartido: header, menú y modal de reserva piden la sesión
+// a la vez y basta con una petición.
+let state: SessionState = PENDING
+let inflight: Promise<SessionData> | null = null
+const listeners = new Set<() => void>()
+
+function setState(next: SessionState) {
+  state = next
+  for (const listener of listeners) listener()
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
   }
 }
 
-export const authClient = createAuthClient({
-  ...(base !== "" ? { baseURL: base } : {}),
-  sessionOptions: {
-    refetchOnWindowFocus: false,
-  },
-})
+async function fetchSession(): Promise<SessionData> {
+  const res = await fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" })
+  if (!res.ok) return null
+  const body = (await res.json()) as SessionData
+  return body?.user != null ? body : null
+}
+
+function loadSession(): Promise<SessionData> {
+  inflight ??= fetchSession()
+    .catch(() => null)
+    .then((data) => {
+      setState({ data, isPending: false })
+      inflight = null
+      return data
+    })
+  return inflight
+}
+
+function useSession(): SessionState {
+  const snapshot = useSyncExternalStore(subscribe, () => state, () => PENDING)
+  useEffect(() => {
+    if (state.isPending) void loadSession()
+  }, [])
+  return snapshot
+}
+
+async function getSession(): Promise<{ data: SessionData }> {
+  return { data: await loadSession() }
+}
+
+async function signOut(): Promise<{ error: Error | null }> {
+  try {
+    const res = await fetch("/api/auth/sign-out", { method: "POST", credentials: "same-origin" })
+    if (!res.ok) return { error: new Error(`No se pudo cerrar la sesión (${res.status})`) }
+    setState({ data: null, isPending: false })
+    return { error: null }
+  } catch (e) {
+    return { error: e instanceof Error ? e : new Error("No se pudo cerrar la sesión") }
+  }
+}
+
+export const authClient = { useSession, getSession, signOut }

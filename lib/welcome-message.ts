@@ -3,7 +3,7 @@ import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding"
 
 export const DEFAULT_WELCOME_TEMPLATE = `Te damos la bienvenida, {{nombre}}.
 
-Tu ID de usuario es: {{displayId}}
+Para entrar al panel y reservar usa tu correo y tu contraseña.
 
 Qué traer a clase:
 • Botella con agua
@@ -20,24 +20,18 @@ Importante: los planes son mensuales y las clases no son acumulables.
 
 export function buildWelcomeMessage(params: {
   nombre: string
-  displayId: string
   estudio?: string
   plan?: string
   template?: string | null
 }): string {
   const estudio = params.estudio?.trim() || DEFAULT_STUDIO_NAME
   const base = params.template?.trim() ? params.template : DEFAULT_WELCOME_TEMPLATE
-  const body = interpolateMessage(base, {
+  return interpolateMessage(base, {
     nombre: params.nombre,
-    displayId: params.displayId,
     plan: params.plan ?? "Sin plan asignado",
     estudio,
     fecha: new Date().toLocaleDateString("es-MX"),
   })
-  if (body.includes(params.displayId)) {
-    return body
-  }
-  return `${body}\n\nTu ID de usuario: ${params.displayId}`
 }
 
 export function buildWelcomeWhatsAppUrl(phone: string, message: string): string | null {
@@ -50,7 +44,6 @@ export function buildWelcomeWhatsAppUrl(phone: string, message: string): string 
 export async function sendWelcomeNotification(params: {
   userId: string
   nombre: string
-  displayId: string
   phone?: string | null
   template?: string | null
   estudio?: string
@@ -62,7 +55,6 @@ export async function sendWelcomeNotification(params: {
   const estudio = params.estudio?.trim() || DEFAULT_STUDIO_NAME
   const body = buildWelcomeMessage({
     nombre: params.nombre,
-    displayId: params.displayId,
     estudio,
     template: params.template,
   })

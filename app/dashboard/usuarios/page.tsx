@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, eq, desc, asc, count, gte, inArray, isNotNull, sql } from "drizzle-orm"
@@ -30,19 +29,18 @@ function calendarDaysUntilEnd(from: Date, end: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000)
 }
 
-const ALUMNOS_SORT_KEYS = ["displayId", "name", "email", "createdAt"] as const
-const ALUMNOS_DEFAULT_SORT = "displayId"
+const ALUMNOS_SORT_KEYS = ["name", "email", "createdAt"] as const
+const ALUMNOS_DEFAULT_SORT = "name"
 
 type SearchParams = Promise<{ page?: string; sort?: string; dir?: string; tab?: string }>
 
 function alumnosOrderBy(sort: string, dir: ListSortDir) {
   const cols = {
-    displayId: schema.user.displayId,
     name: schema.user.name,
     email: schema.user.email,
     createdAt: schema.user.createdAt,
   } as const
-  const col = cols[sort as keyof typeof cols] ?? schema.user.displayId
+  const col = cols[sort as keyof typeof cols] ?? schema.user.name
   if (dir === "desc") return desc(col)
   return asc(col)
 }
@@ -52,10 +50,7 @@ export default async function AlumnosPage({ searchParams }: { searchParams: Sear
 
   // Ver la lista lo decide el permiso de navegación; editar roles y datos es
   // exclusivo de admin y root, aunque un coach llegue a esta página.
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const sessionRole = session?.user.role ?? ""
   const canManage = sessionRole === "admin" || sessionRole === "root"
 
@@ -91,7 +86,6 @@ export default async function AlumnosPage({ searchParams }: { searchParams: Sear
       email: schema.user.email,
       phone: schema.user.phone,
       notes: schema.user.notes,
-      displayId: schema.user.displayId,
       birthdate: schema.user.birthdate,
       enabled: schema.user.enabled,
       createdAt: schema.user.createdAt,
@@ -261,8 +255,6 @@ export default async function AlumnosPage({ searchParams }: { searchParams: Sear
       phone: alumno.phone,
       notes: alumno.notes,
       birthdate: alumno.birthdate,
-      displayId: alumno.displayId,
-      displayLabel: alumno.displayId ?? "—",
       enabled: userEnabled,
       planId: sub?.planId ?? "",
       billingCycle: sub?.billingCycle ?? "mensual",

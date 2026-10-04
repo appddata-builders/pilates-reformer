@@ -46,9 +46,6 @@ const PG_TABLES = [
   "coupon",
   "plan",
   "studio_policy",
-  "session",
-  "account",
-  "verification",
   "user",
 ] as const
 

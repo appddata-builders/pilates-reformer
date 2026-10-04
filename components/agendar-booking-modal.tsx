@@ -153,13 +153,6 @@ function AgendarBookingForm(props: {
     confirmedBooking.date === bookingDate &&
     confirmedBooking.slotId === scheduleSlotId
 
-  const sessionDisplayIdRaw =
-    sessionUser != null ? (sessionUser as { displayId?: string | null }).displayId : null
-  const sessionDisplayId =
-    typeof sessionDisplayIdRaw === "string" && sessionDisplayIdRaw.trim() !== ""
-      ? sessionDisplayIdRaw
-      : null
-
   useEffect(() => {
     if (bookingDate === "") {
       setDayBooked(null)
@@ -349,9 +342,7 @@ function AgendarBookingForm(props: {
         {sessionUser != null ? (
           <div className="rounded-md border border-green-base/20 bg-green-base/5 px-4 py-3 text-sm">
             <p className="font-medium">{sessionUser.name}</p>
-            {sessionDisplayId != null && sessionDisplayId !== "" ? (
-              <p className="text-black/60 font-mono text-xs">{sessionDisplayId}</p>
-            ) : null}
+            <p className="text-black/60 text-xs">{sessionUser.email}</p>
           </div>
         ) : (
           <p className="text-sm text-black/60">

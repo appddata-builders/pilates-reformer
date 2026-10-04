@@ -1,9 +1,8 @@
 "use server"
 
 import { z } from "zod"
-import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
+import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -11,6 +10,8 @@ import { revokeUserSessions } from "@/lib/revoke-user-sessions"
 import { resetUserPassword } from "@/lib/reset-user-password"
 import { routes } from "@/lib/routes"
 import { changeUserRole } from "@/lib/user-role.server"
+import { CognitoPasswordError, deleteCognitoUser, updateCognitoUser } from "@/lib/cognito"
+import { createUserAccount, normalizeEmail } from "@/lib/user-accounts"
 
 export type ActionState = {
   success: boolean
@@ -20,10 +21,7 @@ export type ActionState = {
 }
 
 async function assertAdminLike() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-    query: { disableRefresh: true },
-  })
+  const session = await getSession()
   const ok =
     session != null &&
     (session.user.role === "admin" || session.user.role === "root")
@@ -64,27 +62,21 @@ export async function createCoachAction(
   }
 
   try {
-    await auth.api.signUpEmail({
-      body: {
-        name: parsed.data.name,
-        email: parsed.data.email,
-        password: parsed.data.password,
-      },
+    await createUserAccount(getDb(), {
+      name: parsed.data.name,
+      email: parsed.data.email,
+      password: parsed.data.password,
+      role: "coach",
+      phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
     })
-    const db = getDb()
-    await db
-      .update(schema.user)
-      .set({
-        role: "coach",
-        phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
-        enabled: true,
-      })
-      .where(eq(schema.user.email, parsed.data.email))
 
     revalidatePath("/dashboard/coaches")
     revalidatePath("/dashboard/clases")
     return { success: true }
   } catch (e) {
+    if (e instanceof CognitoPasswordError) {
+      return { success: false, fieldErrors: { password: [e.message] } }
+    }
     const msg = e instanceof Error ? e.message : "Error de base de datos"
     if (msg.toLowerCase().includes("exists") || msg.toLowerCase().includes("unique")) {
       return { success: false, error: "El correo ya está registrado" }
@@ -127,6 +119,7 @@ export async function updateCoachAction(
       name: schema.user.name,
       role: schema.user.role,
       enabled: schema.user.enabled,
+      cognitoId: schema.user.cognitoId,
     })
     .from(schema.user)
     .where(eq(schema.user.id, parsed.data.id))
@@ -141,11 +134,12 @@ export async function updateCoachAction(
     return { success: false, error: "No puedes cambiar tu propio rol" }
   }
 
-  if (parsed.data.email !== existing.email) {
+  const emailNext = normalizeEmail(parsed.data.email)
+  if (emailNext !== existing.email) {
     const [emailTaken] = await db
       .select({ id: schema.user.id })
       .from(schema.user)
-      .where(eq(schema.user.email, parsed.data.email))
+      .where(eq(schema.user.email, emailNext))
       .limit(1)
     if (emailTaken != null && emailTaken.id !== parsed.data.id) {
       return { success: false, error: "El correo ya está registrado" }
@@ -153,11 +147,17 @@ export async function updateCoachAction(
   }
 
   try {
+    // Primero Cognito: el login entra con el correo de la base, así que los
+    // dos tienen que cambiar juntos.
+    if (emailNext !== existing.email) {
+      await updateCognitoUser(existing.cognitoId, { email: emailNext })
+    }
+
     await db
       .update(schema.user)
       .set({
         name: parsed.data.name,
-        email: parsed.data.email,
+        email: emailNext,
         phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
         ...(enabledNext !== undefined ? { enabled: enabledNext } : {}),
       })
@@ -294,7 +294,7 @@ export async function deleteCoachAction(
 
   const db = getDb()
   const [existing] = await db
-    .select({ role: schema.user.role, name: schema.user.name })
+    .select({ role: schema.user.role, name: schema.user.name, cognitoId: schema.user.cognitoId })
     .from(schema.user)
     .where(eq(schema.user.id, id))
     .limit(1)
@@ -325,6 +325,7 @@ export async function deleteCoachAction(
       .where(eq(schema.studioEvent.createdBy, id))
 
     await db.delete(schema.user).where(eq(schema.user.id, id))
+    await deleteCognitoUser(existing.cognitoId)
 
     revalidatePath("/dashboard/coaches")
     revalidatePath("/dashboard/clases")
