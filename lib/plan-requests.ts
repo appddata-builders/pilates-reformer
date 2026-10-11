@@ -1,5 +1,6 @@
-import { and, asc, eq, gt, inArray, isNotNull, ne } from "drizzle-orm"
+import { and, asc, eq, gt, inArray, isNotNull, ne, sql } from "drizzle-orm"
 import type { AnyDb } from "@/lib/db"
+import { withAsyncTransaction } from "@/lib/db/async-transaction"
 import * as schema from "@/lib/db/schema"
 import {
   activateSubscriptionForUser,
@@ -148,6 +149,22 @@ export async function getPlanRequestState(db: AnyDb, userId: string): Promise<Pl
 
 export type PlanRequestResult = { ok: true; message: string } | { ok: false; error: string }
 
+/**
+ * Por qué la alumna no puede contratar un plan ahora, o null si puede. Con un
+ * plan vigente no contrata otro: dos periodos a la vez confundirían qué plan
+ * cubre cada reserva y duplicarían el cobro. Elige el siguiente cuando termine
+ * su suscripción.
+ */
+export function planRequestBlockReason(state: PlanRequestState): string | null {
+  if (state.current != null) {
+    return `Tu plan vigente es ${state.current.planName}, hasta el ${formatDay(state.current.endDate)}. Podrás contratar otro plan cuando termine tu suscripción.`
+  }
+  if (state.pendingPlanDebt > 0) {
+    return `Debes ${formatMxn(state.pendingPlanDebt)} de tu plan anterior. Págalo en el estudio y después podrás contratar otro.`
+  }
+  return null
+}
+
 async function notifyStaff(db: AnyDb, title: string, body: string): Promise<void> {
   const staff = await db
     .select({ id: schema.user.id })
@@ -158,11 +175,24 @@ async function notifyStaff(db: AnyDb, title: string, body: string): Promise<void
   }
 }
 
-/** Solicitar un plan, o renovar el que terminó (`renewal`). */
-export async function requestPlan(
-  db: AnyDb,
-  params: { userId: string; planId: string; renewal?: boolean },
-): Promise<PlanRequestResult> {
+type PlanRequestParams = { userId: string; planId: string; renewal?: boolean }
+
+/**
+ * Solicitar un plan, o renovar el que terminó (`renewal`). Va en una
+ * transacción que bloquea a la alumna: un doble clic, dos pestañas o un
+ * reintento de red leían "sin plan" al mismo tiempo y abrían dos planes con dos
+ * cobros. Ahora la segunda espera a la primera y ya ve el plan vigente.
+ */
+export async function requestPlan(db: AnyDb, params: PlanRequestParams): Promise<PlanRequestResult> {
+  return withAsyncTransaction(db, async (tx) => {
+    await tx.update(schema.user)
+      .set({ updatedAt: sql`${schema.user.updatedAt}` })
+      .where(eq(schema.user.id, params.userId))
+    return requestPlanLocked(tx, params)
+  })
+}
+
+async function requestPlanLocked(db: AnyDb, params: PlanRequestParams): Promise<PlanRequestResult> {
   const [user] = await db
     .select({ name: schema.user.name, role: schema.user.role, enabled: schema.user.enabled })
     .from(schema.user)
@@ -177,18 +207,8 @@ export async function requestPlan(
   if (plan == null) {
     return { ok: false, error: "Ese plan ya no está disponible. Elige otro." }
   }
-  if (state.current != null) {
-    return {
-      ok: false,
-      error: `Tu ${state.current.planName} sigue vigente hasta el ${formatDay(state.current.endDate)}. Cuando termine podrás renovarlo o elegir otro.`,
-    }
-  }
-  if (state.pendingPlanDebt > 0) {
-    return {
-      ok: false,
-      error: `Debes ${formatMxn(state.pendingPlanDebt)} de tu plan anterior. Págalo en el estudio y después podrás ${params.renewal ? "renovar" : "solicitar otro"}.`,
-    }
-  }
+  const blocked = planRequestBlockReason(state)
+  if (blocked != null) return { ok: false, error: blocked }
 
   // El periodo anterior terminó: se cierra como vencido, no como baja, y sus
   // clases sin usar pasan al plan nuevo.

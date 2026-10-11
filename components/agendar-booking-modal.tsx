@@ -228,6 +228,7 @@ function AgendarBookingForm(props: {
   const [sameDayAcceptedFor, setSameDayAcceptedFor] = useState<string | null>(null)
   const [suggestedPlans, setSuggestedPlans] = useState<SuggestedPlan[]>([])
   const [subscribedMessage, setSubscribedMessage] = useState<string | null>(null)
+  const [planBlockedMessage, setPlanBlockedMessage] = useState<string | null>(null)
   // Cupo real de la fecha elegida; se recarga al cambiarla y tras reservar.
   const [dayBooked, setDayBooked] = useState<Record<string, number> | null>(null)
   const [loadingDay, setLoadingDay] = useState(false)
@@ -320,6 +321,7 @@ function AgendarBookingForm(props: {
       setSameDayBooking(null)
       setOwnBooking(null)
       setSuggestedPlans([])
+      setPlanBlockedMessage(null)
       return
     }
     if (isCurrentBookingConfirmed) {
@@ -335,6 +337,7 @@ function AgendarBookingForm(props: {
         setSameDayBooking(res.ok ? (res.sameDayBooking ?? null) : null)
         setOwnBooking(res.ownBooking ?? null)
         setSuggestedPlans(res.ok ? (res.suggestedPlans ?? []) : [])
+        setPlanBlockedMessage(res.ok ? (res.planBlockedMessage ?? null) : null)
         // La clase muestra viene marcada por defecto: es gratis y de una sola vez.
         const trial = res.ok && res.trialAvailable === true
         setTrialAvailable(trial)
@@ -668,6 +671,8 @@ function AgendarBookingForm(props: {
                   setEligibilityRefresh((value) => value + 1)
                 }}
               />
+            ) : planBlockedMessage != null ? (
+              <p className="border-t border-amber-200 pt-3 text-xs">{planBlockedMessage}</p>
             ) : null}
           </div>
         ) : sessionUser == null &&

@@ -33,6 +33,8 @@ export function HomePage(props: {
   loggedIn?: boolean;
   /** La cuenta ya redimió su clase muestra: no se le vuelve a ofrecer. */
   trialUsed?: boolean;
+  /** Con sesión pero sin poder contratar (plan vigente, adeudo): por qué. */
+  planBlockedMessage?: string | null;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -379,7 +381,11 @@ export function HomePage(props: {
                               })}
                             </div>
                           </div>
-                          {props.loggedIn ? (
+                          {props.loggedIn && props.planBlockedMessage ? (
+                            <p className="mt-1 rounded-inner border border-black/10 bg-[#f6f1ea] px-4 py-3 text-center text-sm text-black/70">
+                              {props.planBlockedMessage}
+                            </p>
+                          ) : props.loggedIn ? (
                             <SubscribePlanButton
                               planId={activePrice.planId}
                               planName={`${plan.name} ${activePrice.label}`}

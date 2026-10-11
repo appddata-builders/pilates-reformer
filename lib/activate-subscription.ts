@@ -1,6 +1,7 @@
 import type { AnyDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
-import { and, eq, gte, lte } from "drizzle-orm"
+import { and, eq, gte, lte, sql } from "drizzle-orm"
+import { withAsyncTransaction } from "@/lib/db/async-transaction"
 import {
   computeSubscriptionEndDate,
   subscriptionEndOfDay,
@@ -278,16 +279,35 @@ async function findUntouchedSubscriptions(
   return untouched
 }
 
+type ApplyUserPlanParams = {
+  userId: string
+  planId: string
+  billingCycle?: string
+  startDate?: Date
+  /** Queda registrado en el pago que se anula al dar de baja el plan. */
+  actor?: string
+}
+
+/**
+ * Asigna, renueva, cambia o da de baja el plan desde administración. Bloquea a
+ * la alumna durante la operación: dos envíos del formulario leían el mismo
+ * estado y podían abrir dos planes con dos cobros.
+ */
 export async function applyUserPlan(
   db: AnyDb,
-  params: {
-    userId: string
-    planId: string
-    billingCycle?: string
-    startDate?: Date
-    /** Queda registrado en el pago que se anula al dar de baja el plan. */
-    actor?: string
-  },
+  params: ApplyUserPlanParams,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return withAsyncTransaction(db, async (tx) => {
+    await tx.update(schema.user)
+      .set({ updatedAt: sql`${schema.user.updatedAt}` })
+      .where(eq(schema.user.id, params.userId))
+    return applyUserPlanLocked(tx, params)
+  })
+}
+
+async function applyUserPlanLocked(
+  db: AnyDb,
+  params: ApplyUserPlanParams,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const planId = params.planId.trim()
 
@@ -353,12 +373,48 @@ export async function applyUserPlan(
     })
   }
 
+  let carriedClasses = 0
   if (active != null) {
     // Cambio de plan: se cierra el anterior. Su adeudo sigue vivo si alcanzó a
     // usarlo -esas clases se dieron y se cobran-, pero si no consumió nada el
     // cobro pendiente se anula: fue una corrección del plan, no una venta, y
     // dejarlo vivo le facturaba a la alumna dos planes por el mismo periodo.
     const untouched = await findUntouchedSubscriptions(db, params.userId)
+    // Las clases que le quedaban a un plan ya usado pasan al nuevo: su cobro
+    // sigue vivo, así que son clases pagadas y no se pierden con el cambio. Uno
+    // sin usar no pasa sus clases propias, porque su cobro se anula, pero sí
+    // las que había heredado de un plan anterior: esas ya estaban pagadas.
+    const activeRows = await db
+      .select({
+        id: schema.subscription.id,
+        classesRemaining: schema.subscription.classesRemaining,
+        isUnlimited: schema.subscription.isUnlimited,
+        planType: schema.plan.planType,
+        daysPerWeek: schema.plan.daysPerWeek,
+        totalClasses: schema.plan.totalClasses,
+        durationDays: schema.plan.durationDays,
+      })
+      .from(schema.subscription)
+      .innerJoin(schema.plan, eq(schema.subscription.planId, schema.plan.id))
+      .where(
+        and(
+          eq(schema.subscription.userId, params.userId),
+          eq(schema.subscription.status, "active"),
+        ),
+      )
+    carriedClasses = activeRows.reduce((sum, row) => {
+      if (row.isUnlimited === true) return sum
+      const remaining = Math.max(0, row.classesRemaining ?? 0)
+      if (!untouched.includes(row.id)) return sum + remaining
+      const included = planIncludedClasses({
+        planType: row.planType,
+        daysPerWeek: row.daysPerWeek,
+        totalClasses: row.totalClasses,
+        durationDays: row.durationDays,
+        isUnlimited: false,
+      }) ?? 0
+      return sum + Math.max(0, remaining - included)
+    }, 0)
     const closed = await cancelActiveSubscriptionsForUser(db, params.userId)
     const toVoid = closed.filter((id) => untouched.includes(id))
 
@@ -391,5 +447,6 @@ export async function applyUserPlan(
     planId,
     billingCycle: params.billingCycle,
     startDate: params.startDate,
+    carriedClasses,
   })
 }

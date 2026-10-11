@@ -48,6 +48,7 @@ import { loadLandingScheduleBoard } from "@/lib/site/schedule-board.server"
 import { planWeeklyLimit } from "@/lib/plan-quota"
 import { isSubscriptionCurrent, pickPrimarySubscription } from "@/lib/subscription-display"
 import { getMondayOfWeek } from "@/lib/site/schedule"
+import { getPlanRequestState, planRequestBlockReason } from "@/lib/plan-requests"
 
 // El modal los consume desde este mismo módulo.
 export type { ActivePlanSummary, SuggestedPlan }
@@ -616,6 +617,8 @@ export type BookingEligibility = {
   activePlan?: ActivePlanSummary
   /** Alternativas al cobro suelto cuando no hay plan vigente. */
   suggestedPlans?: SuggestedPlan[]
+  /** Por qué no se le ofrecen planes: tiene uno vigente sin clases o debe el anterior. */
+  planBlockedMessage?: string
   /** Aviso del plan: clases de un periodo vencido que hay que cuadrar. */
   planWarning?: string
   /** Clase que ya tiene ese día; elegir otra hora la mueve en vez de duplicarla. */
@@ -744,18 +747,23 @@ export async function checkPublicBookingEligibility(
   }
 
   if (!subCheck.ok) {
-    const [plan, trialUsed, suggestedPlans] = await Promise.all([
+    const [plan, trialUsed, suggestedPlans, requestState] = await Promise.all([
       getIndividualClassPlan(db),
       hasUsedTrialClass(db, alumna.id),
       loadSuggestedPlans(db),
+      getPlanRequestState(db, alumna.id),
     ])
+    // Con un plan vigente que ya no tiene clases, o con el anterior sin pagar,
+    // no se ofrecen planes: «Suscribirme» fallaría. Se explica por qué.
+    const planBlockedMessage = planRequestBlockReason(requestState) ?? undefined
     return {
       ok: true,
       alumnaName: alumna.name,
       willBeCharged:
         plan != null ? { priceMxn: plan.priceMxn, planName: plan.name } : undefined,
       trialAvailable: !trialUsed,
-      suggestedPlans,
+      suggestedPlans: planBlockedMessage != null ? [] : suggestedPlans,
+      planBlockedMessage,
       sameDayBooking,
     }
   }

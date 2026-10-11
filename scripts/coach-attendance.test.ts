@@ -273,3 +273,71 @@ test("El buscador encuentra a cualquier alumn@ por correo o nombre, con su plan"
     assert.deepEqual(await searchAttendanceCandidates(f.db, "a"), [])
   } finally { f.raw.close() }
 })
+
+test("Dos solicitudes simultáneas del mismo plan abren un solo plan con un solo cobro", async () => {
+  const f = await fixture()
+  try {
+    const results = await Promise.all([
+      requestPlan(f.db, { userId: "u", planId: "monthly" }),
+      requestPlan(f.db, { userId: "u", planId: "monthly" }),
+    ])
+    assert.deepEqual(results.map((r) => r.ok).sort(), [false, true])
+    const blocked = results.find((r) => !r.ok)
+    assert.match(blocked && !blocked.ok ? blocked.error : "", /Tu plan vigente es Mensual, hasta el .+\. Podrás contratar otro plan cuando termine tu suscripción\./)
+    assert.equal((await f.db.select().from(schema.subscription)).length, 1)
+    assert.equal((await f.payments()).length, 1)
+  } finally { f.raw.close() }
+})
+
+test("Con plan vigente la alumna no puede cambiar a otro desde su cuenta", async () => {
+  const f = await fixture()
+  try {
+    await f.db.insert(schema.plan).values({ id: "pack", name: "Paquete", priceMxn: 900, totalClasses: 8, planType: "class_pack", daysPerWeek: 0, durationDays: 30 })
+    assert.equal((await requestPlan(f.db, { userId: "u", planId: "monthly" })).ok, true)
+    // Aunque ya no le queden clases, el periodo sigue corriendo.
+    await f.db.update(schema.subscription).set({ classesRemaining: 0 })
+    const change = await requestPlan(f.db, { userId: "u", planId: "pack" })
+    assert.equal(change.ok, false)
+    assert.match(change.ok ? "" : change.error, /Tu plan vigente es Mensual/)
+    assert.equal((await f.db.select().from(schema.subscription)).filter((s) => s.status === "active").length, 1)
+    assert.equal((await f.payments()).length, 1)
+  } finally { f.raw.close() }
+})
+
+test("El admin cambia un plan vigente: hereda las clases pagadas si se usó, anula el cobro si no", async () => {
+  const f = await fixture()
+  try {
+    await f.db.insert(schema.plan).values({ id: "pack", name: "Paquete", priceMxn: 900, totalClasses: 8, planType: "class_pack", daysPerWeek: 0, durationDays: 30 })
+    // Sin reservas en el periodo: lo usado se mide sólo por el contador.
+    await f.db.delete(schema.booking)
+    // Usado: tomó 3 de 12; su cobro sigue vivo y las 9 restantes pasan al nuevo.
+    assert.equal((await applyUserPlan(f.db, { userId: "u", planId: "monthly" })).ok, true)
+    await f.db.update(schema.subscription).set({ classesRemaining: 9 })
+    assert.equal((await applyUserPlan(f.db, { userId: "u", planId: "pack" })).ok, true)
+    let active = (await f.db.select().from(schema.subscription)).filter((s) => s.status === "active")
+    assert.equal(active.length, 1)
+    assert.equal(active[0].classesRemaining, 8 + 9)
+    assert.equal((await f.payments()).filter((p) => p.status === "pending").length, 2)
+
+    // Sin usar: es una corrección; su cobro se anula y sus 8 clases propias no
+    // pasan, pero las 9 que había heredado sí: ya estaban pagadas.
+    assert.equal((await applyUserPlan(f.db, { userId: "u", planId: "monthly" })).ok, true)
+    active = (await f.db.select().from(schema.subscription)).filter((s) => s.status === "active")
+    assert.equal(active.length, 1)
+    assert.equal(active[0].classesRemaining, 12 + 9)
+    const packCharge = (await f.payments()).find((p) => p.concept?.includes("Paquete"))
+    assert.equal(packCharge?.status, "cancelled")
+  } finally { f.raw.close() }
+})
+
+test("Dos envíos simultáneos del admin no abren dos planes", async () => {
+  const f = await fixture()
+  try {
+    await Promise.all([
+      applyUserPlan(f.db, { userId: "u", planId: "monthly" }),
+      applyUserPlan(f.db, { userId: "u", planId: "monthly" }),
+    ])
+    assert.equal((await f.db.select().from(schema.subscription)).filter((s) => s.status === "active").length, 1)
+    assert.equal((await f.payments()).length, 1)
+  } finally { f.raw.close() }
+})
