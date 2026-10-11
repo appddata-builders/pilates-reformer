@@ -1,5 +1,4 @@
 import { isAtLeastAge } from "@/lib/birthdate"
-import { subscriptionCoversDate } from "@/lib/subscription-dates"
 
 export const SENIOR_CLASS_START_TIME = "11:00"
 export const SENIOR_MIN_AGE = 60
@@ -12,54 +11,6 @@ export function startOfStudioWeek(d: Date): Date {
   copy.setDate(copy.getDate() + diffFromMonday)
   copy.setHours(0, 0, 0, 0)
   return copy
-}
-
-export function isFutureBookingWeek(bookingDate: Date, now: Date = new Date()): boolean {
-  return startOfStudioWeek(bookingDate).getTime() > startOfStudioWeek(now).getTime()
-}
-
-export type StudentSelfReleaseCheck =
-  | { ok: true }
-  | { ok: false; message: string }
-
-export function evaluateStudentSelfRelease(params: {
-  bookingDate: Date
-  subscriptionStatus: string
-  subscriptionStartDate: Date | string
-  subscriptionEndDate: Date | number
-  now?: Date
-}): StudentSelfReleaseCheck {
-  const now = params.now ?? new Date()
-
-  if (!isFutureBookingWeek(params.bookingDate, now)) {
-    return {
-      ok: false,
-      message:
-        "Solo puedes liberar horarios de una semana futura. Para esta semana contacta al estudio.",
-    }
-  }
-
-  if (params.subscriptionStatus !== "active") {
-    return {
-      ok: false,
-      message: "No tienes un paquete activo para liberar este horario.",
-    }
-  }
-
-  if (
-    !subscriptionCoversDate(
-      params.subscriptionStartDate,
-      params.subscriptionEndDate,
-      params.bookingDate,
-    )
-  ) {
-    return {
-      ok: false,
-      message: "Tu paquete no cubre esa fecha, así que no puedes liberar el horario tú misma.",
-    }
-  }
-
-  return { ok: true }
 }
 
 export function normalizeStartTime(startTime: string): string {

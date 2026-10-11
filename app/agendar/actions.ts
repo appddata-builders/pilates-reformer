@@ -73,6 +73,8 @@ export type AgendarData = {
   /** Reservas confirmadas por `slotId|YYYY-MM-DD`; sólo las que tienen alguna. */
   bookedBySlotDate: Record<string, number>
   individualClassPrice: number | null
+  /** Planes que se ofrecen en el modal, también a quien aún no tiene cuenta. */
+  suggestedPlans: SuggestedPlan[]
 }
 
 const publicBookingSchema = z.object({
@@ -190,7 +192,10 @@ export async function loadAgendarDataAction(): Promise<AgendarData> {
     bookedBySlotDate[key] = (bookedBySlotDate[key] ?? 0) + 1
   }
 
-  const individualPlan = await getIndividualClassPlan(db)
+  const [individualPlan, suggestedPlans] = await Promise.all([
+    getIndividualClassPlan(db),
+    loadSuggestedPlans(db),
+  ])
 
   return {
     slots,
@@ -199,6 +204,7 @@ export async function loadAgendarDataAction(): Promise<AgendarData> {
     disabledSlotDateKeys,
     bookedBySlotDate,
     individualClassPrice: individualPlan?.priceMxn ?? null,
+    suggestedPlans,
   }
 }
 

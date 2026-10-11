@@ -198,7 +198,7 @@ export default function SetupWeeklySchedule({
         <div>
           <p className="font-display text-xl leading-tight">{t("setup.weekly.schedule.text001")}</p>
           {hasSlots ? (
-            <p className="text-xs font-semibold text-white/70">{weekLabel}</p>
+            <p className="text-sm font-semibold text-white/80 sm:text-base">{weekLabel}</p>
           ) : null}
         </div>
         {hasSlots ? (
@@ -269,14 +269,19 @@ export default function SetupWeeklySchedule({
             <table className="w-full min-w-[480px] border-collapse text-[11px] sm:text-xs">
               <thead>
                 <tr>
-                  <th className="border-b border-r border-white/15 p-1.5 text-left font-bold text-white/70 sm:p-2">
+                  <th className="border-b border-r border-white/15 p-1.5 text-left text-xs font-bold text-white/70 sm:p-2 sm:text-sm">
                     {t("setup.weekly.schedule.text005")}</th>
                   {scheduleDayLabels.map((day) => (
+                    // El número del día junto al nombre ("Lun 5"): sin él se
+                    // perdía qué fecha era cada columna al cambiar de semana.
                     <th
                       key={day.dayOfWeek}
-                      className="border-b border-white/15 p-1.5 text-center font-bold text-white/90 sm:p-2"
+                      className="whitespace-nowrap border-b border-white/15 p-1.5 text-center text-sm font-bold text-white/90 sm:p-2 sm:text-base"
                     >
-                      {day.label}
+                      {day.label}{" "}
+                      <span className="text-white">
+                        {Number(dateStrForWeekDay(monday, day.dayOfWeek).slice(8))}
+                      </span>
                     </th>
                   ))}
                 </tr>

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation"
 import { DashboardBrand } from "@/components/features/admin/dashboard-brand"
 import { canAccessHiddenRegistry } from "@/lib/hidden-registry"
 import { getStudioBranding } from "@/lib/studio-branding"
+import { getDb } from "@/lib/db"
+import { listRequestablePlans } from "@/lib/plan-requests"
 import { RegistryForm } from "./registry-form"
 
 export const metadata: Metadata = {
@@ -11,7 +13,7 @@ export const metadata: Metadata = {
 }
 
 type PageProps = {
-  searchParams: Promise<{ t?: string }>
+  searchParams: Promise<{ t?: string; plan?: string }>
 }
 
 export default async function RegistryPage(props: PageProps) {
@@ -22,7 +24,16 @@ export default async function RegistryPage(props: PageProps) {
     notFound()
   }
 
-  const branding = await getStudioBranding()
+  // El plan que eligió en la landing o en el modal; uno que ya no se ofrece se
+  // ignora y la cuenta se crea sin plan.
+  const planParam = typeof searchParams.plan === "string" ? searchParams.plan.trim() : ""
+  const [branding, plans] = await Promise.all([
+    getStudioBranding(),
+    planParam !== "" ? listRequestablePlans(getDb()) : Promise.resolve([]),
+  ])
+  const chosen = plans.find((plan) => plan.id === planParam)
+  const selectedPlan =
+    chosen != null ? { id: chosen.id, name: chosen.name, priceMxn: chosen.priceMxn } : null
   const registryToken = token ?? ""
 
   return (
@@ -33,7 +44,7 @@ export default async function RegistryPage(props: PageProps) {
         subtitle="Alta de usuario"
         className="mb-8 justify-center"
       />
-      <RegistryForm registryToken={registryToken} />
+      <RegistryForm registryToken={registryToken} selectedPlan={selectedPlan} />
     </div>
   )
 }

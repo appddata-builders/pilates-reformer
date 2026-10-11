@@ -38,6 +38,7 @@ import {
   type PublicBookingState,
   type SuggestedPlan,
 } from "@/app/agendar/actions"
+import { requestPlanAction } from "@/app/dashboard/planes/actions"
 import { routes } from "@/lib/routes"
 import { useTranslation } from "@/lib/text/text-provider"
 
@@ -58,6 +59,108 @@ function formatPlanDate(dateStr: string): string {
   })
 }
 
+/**
+ * Planes que se pueden contratar desde el modal. Con cuenta se activan aquí
+ * mismo (a cuenta, como en «Mis planes»); sin cuenta se manda al registro con
+ * el plan elegido.
+ */
+function PlanSuggestions(props: {
+  plans: SuggestedPlan[]
+  loggedIn: boolean
+  className?: string
+  onSubscribed: (message: string) => void
+}) {
+  const { t } = useTranslation()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const selected = props.plans.find((plan) => plan.id === selectedId) ?? null
+
+  async function subscribe() {
+    if (selected == null || pending) return
+    setPending(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.set("planId", selected.id)
+      const res = await requestPlanAction({ success: false }, fd)
+      if (!res.success) {
+        setError(res.error ?? "No se pudo activar el plan. Intenta de nuevo.")
+        return
+      }
+      props.onSubscribed(res.message ?? "")
+    } catch {
+      setError("No se pudo activar el plan. Intenta de nuevo.")
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className={`space-y-2 ${props.className ?? ""}`}>
+      <p className="font-medium">{t("booking.planSuggestTitle")}</p>
+      <p className="text-xs">{t("booking.planSuggestBody")}</p>
+      <div className="space-y-1" role="radiogroup" aria-label="Planes disponibles">
+        {props.plans.map((plan) => {
+          const isSelected = plan.id === selectedId
+          return (
+            <button
+              key={plan.id}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              disabled={pending}
+              onClick={() => {
+                setSelectedId(plan.id)
+                setError(null)
+              }}
+              className={`flex w-full items-center justify-between gap-3 rounded-inner border px-3 py-2 text-left text-xs transition-colors ${
+                isSelected
+                  ? "border-green-base bg-white ring-1 ring-green-base/30"
+                  : "border-transparent bg-white/70 hover:bg-white"
+              }`}
+            >
+              <span className="font-medium text-[#1b1a18]">{plan.name}</span>
+              <span className="shrink-0 font-semibold text-green-base">
+                {formatMxn(plan.priceMxn)}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {selected != null ? (
+        <p className="text-xs">
+          {props.loggedIn
+            ? `Queda activo hoy y puedes reservar de inmediato. Se genera un pago pendiente de ${formatMxn(selected.priceMxn)} que pagas en el estudio.`
+            : "Crea tu cuenta y, al entrar, suscríbete a este plan desde aquí."}
+        </p>
+      ) : null}
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {props.loggedIn ? (
+        <button
+          type="button"
+          onClick={() => void subscribe()}
+          disabled={selected == null || pending}
+          className="inline-flex rounded-full bg-green-base px-4 py-2 text-xs font-semibold text-white transition hover:bg-green-hover disabled:opacity-50"
+        >
+          {pending ? "Activando..." : "Suscribirme"}
+        </button>
+      ) : selected != null ? (
+        <Link
+          href={`${routes.registry}?plan=${selected.id}`}
+          className="inline-flex rounded-full bg-green-base px-4 py-2 text-xs font-semibold text-white transition hover:bg-green-hover"
+        >
+          Crear cuenta
+        </Link>
+      ) : (
+        <span className="inline-flex rounded-full bg-green-base px-4 py-2 text-xs font-semibold text-white opacity-50">
+          Crear cuenta
+        </span>
+      )}
+    </div>
+  )
+}
+
 function AgendarBookingForm(props: {
   slots: BookingSlotOption[]
   defaultDate: string
@@ -66,6 +169,8 @@ function AgendarBookingForm(props: {
   bookedBySlotDate: Record<string, number>
   initialDate?: string
   initialSlotId?: string
+  /** Planes para quien aún no inicia sesión; con sesión llegan con la elegibilidad. */
+  publicPlans: SuggestedPlan[]
   onClose: () => void
   onBooked?: () => void
 }) {
@@ -75,7 +180,7 @@ function AgendarBookingForm(props: {
     createPublicBookingAction,
     { success: false },
   )
-  const { data: sessionData } = authClient.useSession()
+  const { data: sessionData, isPending: sessionPending } = authClient.useSession()
   const sessionUser = sessionData?.user ?? null
 
   const [scheduleSlotId, setScheduleSlotId] = useState(() => props.initialSlotId ?? "")
@@ -122,6 +227,7 @@ function AgendarBookingForm(props: {
   const [sameDayPromptFor, setSameDayPromptFor] = useState<string | null>(null)
   const [sameDayAcceptedFor, setSameDayAcceptedFor] = useState<string | null>(null)
   const [suggestedPlans, setSuggestedPlans] = useState<SuggestedPlan[]>([])
+  const [subscribedMessage, setSubscribedMessage] = useState<string | null>(null)
   // Cupo real de la fecha elegida; se recarga al cambiarla y tras reservar.
   const [dayBooked, setDayBooked] = useState<Record<string, number> | null>(null)
   const [loadingDay, setLoadingDay] = useState(false)
@@ -413,6 +519,11 @@ function AgendarBookingForm(props: {
             </div>
           )}
         </div>
+        {subscribedMessage != null && !isCurrentBookingConfirmed ? (
+          <p className="rounded-inner border border-green-base/30 bg-green-base/5 px-4 py-3 text-sm text-green-800">
+            {subscribedMessage}
+          </p>
+        ) : null}
         {isCurrentBookingConfirmed ? (
           <div className="space-y-2">
             <p className="text-sm">
@@ -547,30 +658,24 @@ function AgendarBookingForm(props: {
                 <span className="font-semibold">{formatMxn(willBeCharged.priceMxn)}</span>{t("agendar.booking.modal.text019")}</p>
             )}
             {suggestedPlans.length > 0 ? (
-              <div className="space-y-2 border-t border-amber-200 pt-3">
-                <p className="font-medium">{t("booking.planSuggestTitle")}</p>
-                <p className="text-xs">{t("booking.planSuggestBody")}</p>
-                <ul className="space-y-1">
-                  {suggestedPlans.map((plan) => (
-                    <li
-                      key={plan.id}
-                      className="flex items-center justify-between gap-3 rounded-inner bg-white/70 px-3 py-2 text-xs"
-                    >
-                      <span className="font-medium text-[#1b1a18]">{plan.name}</span>
-                      <span className="shrink-0 font-semibold text-green-base">
-                        {formatMxn(plan.priceMxn)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href={routes.planes}
-                  className="inline-flex rounded-full bg-green-base px-4 py-2 text-xs font-semibold text-white transition hover:bg-green-hover"
-                >
-                  {t("booking.planSuggestCta")}
-                </Link>
-              </div>
+              <PlanSuggestions
+                plans={suggestedPlans}
+                loggedIn
+                className="border-t border-amber-200 pt-3"
+                onSubscribed={(message) => {
+                  setSubscribedMessage(message)
+                  // Vuelve a revisar: ahora el plan nuevo cubre la clase.
+                  setEligibilityRefresh((value) => value + 1)
+                }}
+              />
             ) : null}
+          </div>
+        ) : sessionUser == null &&
+          !sessionPending &&
+          scheduleSlotId !== "" &&
+          props.publicPlans.length > 0 ? (
+          <div className="rounded-inner border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <PlanSuggestions plans={props.publicPlans} loggedIn={false} onSubscribed={() => {}} />
           </div>
         ) : checkMessage ? (
           <p className={`text-sm ${checkOk ? "text-green-700" : "text-red-600"}`}>
@@ -785,6 +890,7 @@ export function AgendarBookingModal(props: {
             bookedBySlotDate={data.bookedBySlotDate}
             initialDate={props.initialDate ?? undefined}
             initialSlotId={props.initialSlotId ?? undefined}
+            publicPlans={data.suggestedPlans}
             onClose={handleClose}
             onBooked={props.onBooked}
           />

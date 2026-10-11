@@ -91,16 +91,29 @@ export function evaluateCancellation(
   return { ok: true, restoreClass: true, late: false }
 }
 
-export function evaluateAlumnoSelfCancellation(
+/**
+ * La alumna libera o cambia de hora una clase de su plan. Regla del reglamento:
+ * sólo con la anticipación mínima de Configuración (6 horas = 360 minutos);
+ * después la clase cuenta como utilizada y se queda descontada del paquete.
+ * No importa la semana: con tiempo suficiente puede mover cualquier horario.
+ */
+export function evaluateStudentRelease(
   now: Date,
   classStart: Date,
-  policy: StudioCancellationPolicy,
-  selfRelease: { ok: true } | { ok: false; message: string },
+  policy: Pick<StudioCancellationPolicy, "cancelMinutes">,
+  action: "liberar" | "cambiar de horario" = "liberar",
 ): CancellationCheckResult {
-  if (!selfRelease.ok) {
-    return { ok: false, message: selfRelease.message }
+  const minutesLeft = minutesUntilClass(now, classStart)
+  if (minutesLeft <= 0) {
+    return { ok: false, message: `La clase ya empezó; ya no se puede ${action}.` }
   }
-  return evaluateCancellation(now, classStart, policy)
+  if (minutesLeft < policy.cancelMinutes) {
+    return {
+      ok: false,
+      message: `Solo se pueden ${action} las clases con ${formatMinimumCancelNotice(policy.cancelMinutes)} de anticipación.`,
+    }
+  }
+  return { ok: true, restoreClass: true, late: false }
 }
 
 export function minutesUntilClassEnd(now: Date, classEnd: Date): number {

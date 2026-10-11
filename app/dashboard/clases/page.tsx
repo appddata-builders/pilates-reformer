@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq, and, gte, lte, asc } from "drizzle-orm"
@@ -14,8 +15,9 @@ import type { SlotCardData } from "./slot-card"
 export default async function ClasesPage() {
   const session = await getSession()
   const role = session?.user?.role ?? ""
-  const hideInstructor = hidesInstructorAssignment(role)
-  const canManage = role === "admin" || role === "root"
+  const canManage = await canManageModule(role, "clases")
+  // El coach con permiso de Clases las administra completas, instructor incluido.
+  const hideInstructor = hidesInstructorAssignment(role) && !canManage
 
   const db = getDb()
 

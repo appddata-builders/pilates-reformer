@@ -5,7 +5,6 @@ import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, eq, gte, lte } from "drizzle-orm"
 import { getAttendanceCatalog, type AttendanceCatalogItem } from "@/lib/coach-attendance"
-import { coachTeachesSlot } from "@/lib/schedule-instructor"
 import { dateRangeForDay } from "@/lib/booking-slot-options"
 
 export type SlotRosterStudent = {
@@ -24,7 +23,6 @@ export type SlotRoster =
       capacity: number
       students: SlotRosterStudent[]
       catalog: AttendanceCatalogItem[]
-      canMarkAttendance: boolean
     }
   | { ok: false; error: string }
 
@@ -44,9 +42,6 @@ export async function getSlotRosterAction(
     .select({
       className: schema.scheduleSlot.className,
       capacity: schema.scheduleSlot.capacity,
-      instructor: schema.scheduleSlot.instructor,
-      alternateInstructor: schema.scheduleSlot.alternateInstructor,
-      scheduleMode: schema.scheduleSlot.scheduleMode,
     })
     .from(schema.scheduleSlot)
     .where(eq(schema.scheduleSlot.id, scheduleSlotId))
@@ -90,6 +85,5 @@ export async function getSlotRosterAction(
     capacity: slot.capacity,
     students: rows,
     catalog: await getAttendanceCatalog(db),
-    canMarkAttendance: role !== "coach" || coachTeachesSlot(slot, session.user.name ?? ""),
   }
 }

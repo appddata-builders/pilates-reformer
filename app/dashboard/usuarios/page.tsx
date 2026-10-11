@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, eq, desc, asc, count, gte, inArray, isNotNull, sql } from "drizzle-orm"
@@ -48,11 +49,11 @@ function alumnosOrderBy(sort: string, dir: ListSortDir) {
 export default async function AlumnosPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
 
-  // Ver la lista lo decide el permiso de navegación; editar roles y datos es
-  // exclusivo de admin y root, aunque un coach llegue a esta página.
+  // Ver la lista lo decide el permiso de navegación, y editar también: un coach
+  // con el módulo Usuarios habilitado administra igual que admin.
   const session = await getSession()
   const sessionRole = session?.user.role ?? ""
-  const canManage = sessionRole === "admin" || sessionRole === "root"
+  const canManage = await canManageModule(sessionRole, "usuarios")
 
   const sort = parseListSort(params.sort, ALUMNOS_SORT_KEYS, ALUMNOS_DEFAULT_SORT)
   const dir = parseListSortDir(params.dir)

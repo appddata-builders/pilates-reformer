@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, eq, gte, lte } from "drizzle-orm"
@@ -40,8 +41,8 @@ function colorForKind(kind: string) {
   return "#378ADD"
 }
 
-function includesStudioEvent(role: string, visibleTo: string) {
-  if (role === "admin" || role === "root") return true
+function includesStudioEvent(role: string, visibleTo: string, canManage: boolean) {
+  if (canManage) return true
   if (role === "coach") return visibleTo === "coach" || visibleTo === "all"
   return false
 }
@@ -58,7 +59,7 @@ export default async function CalendarioPage() {
   const role = session.user.role
   if (role !== "admin" && role !== "root" && role !== "coach") redirect("/dashboard")
 
-  const canManage = role === "admin" || role === "root"
+  const canManage = await canManageModule(role, "calendario")
 
   const now = new Date()
   const rangeStart = dayStart(new Date(now.getFullYear(), now.getMonth() - 1, 1))
@@ -86,7 +87,7 @@ export default async function CalendarioPage() {
 
   const studioRows = await db.select().from(schema.studioEvent)
   for (const ev of studioRows) {
-    if (!includesStudioEvent(role, ev.visibleTo)) continue
+    if (!includesStudioEvent(role, ev.visibleTo, canManage)) continue
     const start = ev.startDate instanceof Date ? ev.startDate : new Date(ev.startDate as unknown as number)
     const end =
       ev.endDate == null

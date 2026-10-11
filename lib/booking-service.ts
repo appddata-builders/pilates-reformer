@@ -2,17 +2,13 @@ import type { AnyDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, eq, gte, isNull, lt, lte } from "drizzle-orm"
 import { dateRangeForDay, toLocalDateStr } from "@/lib/booking-slot-options"
-import {
-  evaluateStudentSelfRelease,
-  startOfStudioWeek,
-  validateBookingAgeForSlot,
-} from "@/lib/booking-rules"
+import { startOfStudioWeek, validateBookingAgeForSlot } from "@/lib/booking-rules"
 import {
   classEndFromBooking,
   classStartFromBooking,
-  evaluateAlumnoSelfCancellation,
   evaluateCancellation,
   evaluateBookingAllowed,
+  evaluateStudentRelease,
   loadStudioCancellationPolicy,
 } from "@/lib/cancellation-policy"
 import { consumeClassFromSubscription, restoreClassToSubscription } from "@/lib/subscription-logic"
@@ -188,7 +184,7 @@ export async function checkBookableSubscriptionForUser(
 
   if (!isSubscriptionCurrent(primary.status, primary.endDate)) {
     // Las clases que ya pagó no se pierden porque el periodo se venza: se dejan
-    // tomar, pero avisando, porque el estudio tiene que cuadrarlas al renovar.
+    // tomar y, si renueva antes de usarlas, pasan al plan nuevo.
     if (remaining == null || remaining <= 0) {
       return {
         ok: false,
@@ -202,8 +198,8 @@ export async function checkBookableSubscriptionForUser(
         ? primary.endDate
         : new Date(primary.endDate as unknown as number)
     warning =
-      `Tu plan venció el ${formatShortDate(endDate)} y te ${remaining === 1 ? "queda 1 clase" : `quedan ${remaining} clases`} sin tomar. ` +
-      "Puedes usarlas, pero coordina con el estudio para que las tomen en cuenta al renovar."
+      `Tu plan venció el ${formatShortDate(endDate)}, pero te ${remaining === 1 ? "queda 1 clase" : `quedan ${remaining} clases`} en tu cuenta. ` +
+      "Esta reserva se descuenta de ellas; si renuevas, las que sobren pasan a tu plan nuevo."
   }
 
   if (remaining != null && remaining <= 0) {
@@ -477,11 +473,10 @@ export async function changeBookingSlotForUser(
   const targetCheck = evaluateBookingAllowed(now, targetEnd, policy)
   if (!targetCheck.ok) return { ok: false, message: targetCheck.message }
 
-  // ...y la que deja tiene que seguir dentro de la ventana para soltarse. Se
-  // salta la regla de "sólo semanas futuras" a propósito: cambiar de hora no
-  // libera un lugar neto, sólo lo mueve dentro del mismo día.
+  // ...y la que deja tiene que seguir dentro de la anticipación mínima, la misma
+  // regla que para liberarla.
   const currentStart = classStartFromBooking(bookingDate, current.startTime)
-  const releaseCheck = evaluateCancellation(now, currentStart, policy)
+  const releaseCheck = evaluateStudentRelease(now, currentStart, policy, "cambiar de horario")
   if (!releaseCheck.ok) return { ok: false, message: releaseCheck.message }
 
   await db
@@ -723,7 +718,6 @@ export async function cancelBookingById(
           id: schema.subscription.id,
           userId: schema.subscription.userId,
           status: schema.subscription.status,
-          startDate: schema.subscription.startDate,
           endDate: schema.subscription.endDate,
         })
         .from(schema.subscription)
@@ -737,20 +731,14 @@ export async function cancelBookingById(
       const primary = pickPrimarySubscription(subs)
 
       // Sin plan de por medio una clase sí se puede cancelar: la única regla es
-      // que todavía no empiece. Las del plan siguen las reglas del plan.
+      // que todavía no empiece. Las del plan se liberan con la anticipación
+      // mínima, de cualquier semana, y la clase regresa al plan.
       if (outsidePlan || primary == null) {
         if (now >= classStart) {
           return { ok: false, message: "La clase ya empezó; ya no se puede cancelar." }
         }
       } else {
-        const selfRelease = evaluateStudentSelfRelease({
-          bookingDate,
-          subscriptionStatus: primary.status,
-          subscriptionStartDate: primary.startDate,
-          subscriptionEndDate: primary.endDate,
-          now,
-        })
-        const check = evaluateAlumnoSelfCancellation(now, classStart, policy, selfRelease)
+        const check = evaluateStudentRelease(now, classStart, policy)
         if (!check.ok) {
           return { ok: false, message: check.message }
         }

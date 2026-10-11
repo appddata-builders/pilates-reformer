@@ -148,6 +148,16 @@ export const PLAN_DISPLAY_ORDER = STUDIO_PLAN_DEFINITIONS.map((p) => p.id)
 
 export const SINGLE_CLASS_LABEL = "Clase individual"
 
+const PLAN_CARD_IMAGES = [
+  `${process.env.NEXT_PUBLIC_S3}pilates_6.jpg`,
+  `${process.env.NEXT_PUBLIC_S3}pilates_1.jpg`,
+]
+
+/** Foto de la tarjeta de plan, alternada; la comparten la landing y el panel. */
+export function planCardImage(index: number): string {
+  return PLAN_CARD_IMAGES[index % PLAN_CARD_IMAGES.length]
+}
+
 export const FREE_SAMPLE_PLAN_ID = "plan-apertura"
 
 export const FREE_SAMPLE_CLASS_LABEL = "Clase muestra gratis"

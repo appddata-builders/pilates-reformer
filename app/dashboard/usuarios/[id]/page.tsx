@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { PageHeader } from "@/components/features/admin/page-header"
@@ -36,10 +37,11 @@ export default async function AlumnoDetailPage(props: { params: Promise<{ id: st
   const { id } = await props.params
   const db = getDb()
 
-  // Confirmar cobros es de admin y root, no de un coach que llegue a la ficha.
+  // Confirmar cobros es de quien tiene el módulo Pagos: admin, root o un coach
+  // al que se le habilitó.
   const session = await getSession()
   const sessionRole = session?.user.role ?? ""
-  const canManage = sessionRole === "admin" || sessionRole === "root"
+  const canManage = await canManageModule(sessionRole, "pagos")
 
   const [alumno] = await db
     .select()

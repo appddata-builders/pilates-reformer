@@ -19,6 +19,7 @@ export type MiPlanRow = {
   isUnlimited: boolean
   paidAmount: number | null
   vigente: boolean
+  conClasesPorUsar: boolean
 }
 
 function formatMxn(amount: number): string {
@@ -59,17 +60,20 @@ export function MisPlanes(props: {
 }) {
   const request = props.requestState
   const blockedByDebt = request.pendingPlanDebt > 0
-  const activos = props.rows.filter((r) => r.vigente)
-  const pasados = props.rows.filter((r) => !r.vigente)
+  const activos = props.rows.filter((r) => r.vigente || r.conClasesPorUsar)
+  const pasados = props.rows.filter((r) => !r.vigente && !r.conClasesPorUsar)
+  const vigentes = props.rows.filter((r) => r.vigente).length
 
   return (
     <div className="p-6 space-y-6">
       <PageHeader
         title="Mis planes"
         description={
-          activos.length === 0
-            ? "No tienes un plan o paquete vigente"
-            : `${activos.length} vigente${activos.length === 1 ? "" : "s"}`
+          vigentes > 0
+            ? `${vigentes} vigente${vigentes === 1 ? "" : "s"}`
+            : activos.length > 0
+              ? "Tu plan venció, pero aún tienes clases por usar"
+              : "No tienes un plan o paquete vigente"
         }
       >
         <Button asChild>
@@ -83,8 +87,8 @@ export function MisPlanes(props: {
             Tienes {formatMxn(props.pendingBalance)} por regularizar
           </p>
           <p className="mt-1">
-            Son clases que apartaste sin pago previo. Págalas en el estudio y ahí las
-            registran como recibidas.
+            Son clases que apartaste sin pago previo. Puedes pagar en el estudio
+            o hacer transferencia.
           </p>
         </div>
       ) : null}
@@ -101,6 +105,15 @@ export function MisPlanes(props: {
                   ? "Renuévalo para seguir reservando con tu plan, o elige otro abajo."
                   : "Ese plan ya no está disponible; elige otro abajo."}
               </p>
+              {request.renewable.classesLeft > 0 ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Te{" "}
+                  {request.renewable.classesLeft === 1
+                    ? "queda 1 clase"
+                    : `quedan ${request.renewable.classesLeft} clases`}
+                  : puedes usarlas y, si renuevas, las que sobren pasan al plan nuevo.
+                </p>
+              ) : null}
             </div>
             {request.renewable.available ? (
               <div className="sm:w-48">
@@ -144,7 +157,13 @@ export function MisPlanes(props: {
                     </p>
                     <h3 className="mt-0.5 truncate text-base font-semibold">{row.planName}</h3>
                   </div>
-                  <Badge className="border-green-200 bg-green-100 text-green-700">Vigente</Badge>
+                  {row.vigente ? (
+                    <Badge className="border-green-200 bg-green-100 text-green-700">Vigente</Badge>
+                  ) : (
+                    <Badge className="border-amber-200 bg-amber-50 text-amber-800">
+                      Vencido · clases por usar
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="mt-4 space-y-2 text-sm">

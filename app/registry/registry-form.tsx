@@ -12,6 +12,13 @@ import {
   WELCOME_POLICY_PDF_PATH,
 } from "@/lib/hidden-registry"
 import {
+  STUDIO_POLICIES_INTRO,
+  STUDIO_POLICIES_SUBTITLE,
+  STUDIO_POLICIES_TITLE,
+  STUDIO_POLICIES_VERSION,
+  STUDIO_POLICY_SECTIONS,
+} from "@/lib/studio-policies"
+import {
   Card,
   CardContent,
   CardDescription,
@@ -33,7 +40,12 @@ const initial: RegistryActionState = { success: false }
  * aquí se confirma. Con la contraseña recién escrita se abre la sesión y entra
  * directo al panel. Si se cierra esta pantalla, el login pide el código.
  */
-function RegistryConfirmCard(props: { email: string; password: string }) {
+function RegistryConfirmCard(props: {
+  email: string
+  password: string
+  planMessage?: string
+  planError?: string
+}) {
   const [code, setCode] = useState("")
   const [pending, setPending] = useState(false)
   const [resending, setResending] = useState(false)
@@ -79,6 +91,16 @@ function RegistryConfirmCard(props: { email: string; password: string }) {
       </CardHeader>
       <form onSubmit={handleConfirm} className="flex flex-col gap-6">
         <CardContent className="space-y-4">
+          {props.planMessage ? (
+            <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              {props.planMessage}
+            </p>
+          ) : null}
+          {props.planError ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Tu cuenta quedó creada, pero el plan no se activó: {props.planError}
+            </p>
+          ) : null}
           {errorMsg ? <p className="text-sm text-destructive">{errorMsg}</p> : null}
           {infoMsg ? <p className="text-sm text-muted-foreground">{infoMsg}</p> : null}
           <div className="space-y-2">
@@ -125,17 +147,36 @@ function RegistryConfirmCard(props: { email: string; password: string }) {
   )
 }
 
-export function RegistryForm(props: { registryToken: string }) {
+function formatMxn(amount: number): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+export function RegistryForm(props: {
+  registryToken: string
+  /** Plan elegido en la landing o el modal; se activa al crear la cuenta. */
+  selectedPlan: { id: string; name: string; priceMxn: number } | null
+}) {
   const [passwordVisible, setPasswordVisible] = useState(false)
-  const [policyDownloaded, setPolicyDownloaded] = useState(false)
+  // La casilla se habilita hasta que el alumno recorre las políticas completas.
+  const [policyRead, setPolicyRead] = useState(false)
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [state, action, pending] = useActionState(hiddenRegistryAction, initial)
   // La contraseña sólo vive en memoria: con ella se abre la sesión al confirmar.
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
-  const canSubmit = policyDownloaded && policyAccepted
   const passwordReady = isPasswordValid(password) && password === confirmPassword
+
+  function handlePolicyScroll(e: React.UIEvent<HTMLDivElement>) {
+    const box = e.currentTarget
+    if (box.scrollTop + box.clientHeight >= box.scrollHeight - 16) {
+      setPolicyRead(true)
+    }
+  }
 
   useEffect(() => {
     if (state.success) {
@@ -144,7 +185,14 @@ export function RegistryForm(props: { registryToken: string }) {
   }, [state.success])
 
   if (state.success) {
-    return <RegistryConfirmCard email={state.email ?? ""} password={password} />
+    return (
+      <RegistryConfirmCard
+        email={state.email ?? ""}
+        password={password}
+        planMessage={state.planMessage}
+        planError={state.planError}
+      />
+    )
   }
 
   return (
@@ -155,14 +203,36 @@ export function RegistryForm(props: { registryToken: string }) {
       </CardHeader>
       <form action={action} className="flex flex-col gap-6">
         <input type="hidden" name="registryToken" value={props.registryToken} />
-        <input type="hidden" name="policyDownloaded" value={policyDownloaded ? "true" : "false"} />
         <input type="hidden" name="policyAccepted" value={policyAccepted ? "true" : "false"} />
+        <input type="hidden" name="planId" value={props.selectedPlan?.id ?? ""} />
         <div className="hidden" aria-hidden="true">
           <Label htmlFor="company">Empresa</Label>
           <Input id="company" name="company" tabIndex={-1} autoComplete="off" />
         </div>
         <CardContent className="space-y-4">
           {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+          {props.selectedPlan != null ? (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="font-medium">{props.selectedPlan.name}</p>
+                <p className="shrink-0 font-semibold">{formatMxn(props.selectedPlan.priceMxn)}</p>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Queda activo al crear tu cuenta y puedes reservar de inmediato. Se genera un pago
+                pendiente que pagas en el estudio o por transferencia.
+              </p>
+              <Link
+                href={
+                  props.registryToken !== ""
+                    ? `${routes.registry}?t=${encodeURIComponent(props.registryToken)}`
+                    : routes.registry
+                }
+                className="mt-1 inline-block text-xs text-primary hover:underline"
+              >
+                Crear la cuenta sin plan
+              </Link>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="name">Nombre completo</Label>
             <Input id="name" name="name" required minLength={2} maxLength={120} autoComplete="name" />
@@ -247,42 +317,46 @@ export function RegistryForm(props: { registryToken: string }) {
             <PasswordChecklist password={password} confirm={confirmPassword} />
           </div>
           <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-            <p className="text-sm font-medium">Acuerdo y políticas</p>
-            <p className="text-xs text-muted-foreground">
-              Descarga el documento, revísalo y acepta para habilitar el registro.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setPolicyDownloaded(true)
-                const link = document.createElement("a")
-                link.href = WELCOME_POLICY_PDF_PATH
-                link.download = WELCOME_POLICY_PDF_FILENAME
-                link.target = "_blank"
-                link.rel = "noopener noreferrer"
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-              }}
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-medium">{STUDIO_POLICIES_TITLE}</p>
+              <a
+                href={WELCOME_POLICY_PDF_PATH}
+                download={WELCOME_POLICY_PDF_FILENAME}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 text-xs text-primary hover:underline"
+              >
+                Descargar PDF
+              </a>
+            </div>
+            <div
+              onScroll={handlePolicyScroll}
+              tabIndex={0}
+              role="region"
+              aria-label={STUDIO_POLICIES_TITLE}
+              className="max-h-72 overflow-y-auto rounded-md border bg-background p-3 text-xs leading-relaxed text-muted-foreground space-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {policyDownloaded ? "Documento descargado" : "Descargar acuerdo (PDF)"}
-            </Button>
-            <a
-              href={WELCOME_POLICY_PDF_PATH}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline block text-center"
-              onClick={() => setPolicyDownloaded(true)}
-            >
-              Ver PDF en nueva pestaña
-            </a>
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">{STUDIO_POLICIES_SUBTITLE}</p>
+                <p>{STUDIO_POLICIES_VERSION}</p>
+              </div>
+              <p>{STUDIO_POLICIES_INTRO}</p>
+              {STUDIO_POLICY_SECTIONS.map((section) => (
+                <div key={section.title} className="space-y-1">
+                  <p className="font-medium text-foreground">{section.title}</p>
+                  <ul className="list-disc space-y-1 pl-4">
+                    {section.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
             <div className="flex items-start gap-3">
               <Checkbox
                 id="policyAccepted"
                 checked={policyAccepted}
-                disabled={!policyDownloaded}
+                disabled={!policyRead}
                 onCheckedChange={(value) => {
                   if (value === true) {
                     setPolicyAccepted(true)
@@ -293,22 +367,28 @@ export function RegistryForm(props: { registryToken: string }) {
               />
               <Label
                 htmlFor="policyAccepted"
-                className={`text-sm leading-snug font-normal ${policyDownloaded ? "" : "text-muted-foreground"}`}
+                className={`text-sm leading-snug font-normal ${policyRead ? "" : "text-muted-foreground"}`}
               >
-                He leído y acepto el acuerdo de bienvenida y las políticas del estudio
+                He leído y acepto las Políticas, Términos y Condiciones de Studio 57 Pilates
+                Reformer.
               </Label>
             </div>
-            {!canSubmit ? (
+              <div className="text-xs text-muted-foreground">
+                * Incluyendo las condiciones de pago (50% al reservar y 50% durante la
+                primera clase del paquete), y la política de cancelación o reprogramación con al
+                menos 6 horas de anticipación.
+              </div>
+            {!policyAccepted ? (
               <p className="text-xs text-muted-foreground">
-                {!policyDownloaded
-                  ? "Primero descarga o abre el PDF."
+                {!policyRead
+                  ? "Desliza las políticas hasta el final para poder aceptarlas."
                   : "Marca la casilla de aceptación para continuar."}
               </p>
             ) : null}
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Button className="w-full" type="submit" disabled={pending || !canSubmit || !passwordReady}>
+          <Button className="w-full" type="submit" disabled={pending || !policyAccepted || !passwordReady}>
             {pending ? "Registrando..." : "Crear cuenta"}
           </Button>
           <p className="text-xs text-center text-muted-foreground">

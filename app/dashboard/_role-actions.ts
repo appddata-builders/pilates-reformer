@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import { routes } from "@/lib/routes"
 import { parseManageableRole } from "@/lib/user-role"
@@ -18,7 +19,7 @@ export async function changeUserRoleAction(
 ): Promise<ChangeRoleState> {
   const session = await getSession()
   const isAdminLike =
-    session != null && (session.user.role === "admin" || session.user.role === "root")
+    session != null && (await canManageModule(session.user.role, "usuarios"))
   if (!isAdminLike || session == null) {
     return { success: false, error: "No autorizado" }
   }

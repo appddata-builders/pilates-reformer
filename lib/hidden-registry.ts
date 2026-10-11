@@ -1,13 +1,11 @@
 import { z } from "zod"
 import { passwordSchema } from "@/lib/password-rules"
 
-export const WELCOME_POLICY_PDF_PATH = "/assets/docs/pilates-reformer-welcome-policy-001.pdf"
-export const WELCOME_POLICY_PDF_FILENAME = "pilates-reformer-welcome-policy-001.pdf"
+export const WELCOME_POLICY_PDF_PATH = "/assets/docs/politicas-studio-57-pilates-reformer.pdf"
+export const WELCOME_POLICY_PDF_FILENAME = "politicas-studio-57-pilates-reformer.pdf"
 
 export function isRegistryPolicyComplete(formData: FormData): boolean {
-  const downloaded = formData.get("policyDownloaded")
-  const accepted = formData.get("policyAccepted")
-  return downloaded === "true" && accepted === "true"
+  return formData.get("policyAccepted") === "true"
 }
 
 export function isHiddenRegistryEnabled(): boolean {

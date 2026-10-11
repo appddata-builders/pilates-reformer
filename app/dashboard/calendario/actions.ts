@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -10,8 +11,7 @@ import { eq } from "drizzle-orm"
 async function assertManageCalendar() {
   const session = await getSession()
   const ok =
-    session != null &&
-    (session.user.role === "admin" || session.user.role === "root")
+    session != null && (await canManageModule(session.user.role, "calendario"))
   return { session, ok }
 }
 

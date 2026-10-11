@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { FaPlayCircle, FaRegStopCircle } from "react-icons/fa";
 import { FaInstagram, FaWhatsapp } from "react-icons/fa6";
@@ -19,28 +18,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { routes } from "@/lib/routes";
 import { AccountNavLink } from "@/components/features/site/account-nav-link";
+import { SubscribePlanButton } from "@/components/features/site/subscribe-plan-button";
 import type { LandingScheduleBoard } from "@/lib/site/schedule-board.server";
-import type { PublicPlan } from "@/lib/site/plans";
+import { planCardImage, type PublicPlan } from "@/lib/site/plans";
 import { useTranslation } from "@/lib/text/text-provider";
 
 const LOGO_SRC = `${process.env.NEXT_PUBLIC_S3}Studio57.jpeg`;
 
-const PLAN_IMAGES = [
-  `${process.env.NEXT_PUBLIC_S3}pilates_6.jpg`,
-  `${process.env.NEXT_PUBLIC_S3}pilates_1.jpg`,
-  `${process.env.NEXT_PUBLIC_S3}pilates_6.jpg`,
-  `${process.env.NEXT_PUBLIC_S3}pilates_1.jpg`,
-];
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0 },
-};
-
-const stagger = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.12 } },
-};
 
 export function HomePage(props: {
   plans: PublicPlan[];
@@ -53,7 +38,8 @@ export function HomePage(props: {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
-  const [heroVideoPlaying, setHeroVideoPlaying] = useState(true);
+  // Arranca en pausa: el video se pide hasta que la página terminó de cargar.
+  const [heroVideoPlaying, setHeroVideoPlaying] = useState(false);
 
   const planCards = props.plans.filter((plan) => plan.layout === "card");
   const planBars = props.plans.filter((plan) => plan.layout === "bar");
@@ -106,14 +92,14 @@ export function HomePage(props: {
       className="relative min-h-screen overflow-clip bg-[#f9f0e3] text-[#1b1a18]"
     >
       <div className="pointer-events-none absolute -left-20 top-40 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(47,107,95,0.25),transparent_70%)] blur-3xl" />
-      <div className="pointer-events-none absolute right-[-120px] top-[-60px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(47,79,79,0.35),transparent_70%)] blur-3xl animate-float" />
+      {/* Sin animación: queda detrás del video y animarla con blur costaba un repintado por cuadro. */}
+      <div className="pointer-events-none absolute right-[-120px] top-[-60px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(47,79,79,0.35),transparent_70%)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-120px] left-1/3 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(255,215,186,0.5),transparent_70%)] blur-3xl" />
 
-      <motion.nav
-        initial={{ y: -16, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        className={`fixed left-1/2 top-0 z-50 w-full -translate-x-1/2  border pl-3 pr-4 py-2  backdrop-blur transition border-black/10 bg-white/95 text-[#1b1a18] shadow-[0_12px_30px_rgba(27,26,24,0.12)]`}
+      {/* Sin backdrop-blur: con bg-white/95 casi no se notaba y sobre el video
+          obligaba a desenfocar de nuevo en cada cuadro. */}
+      <nav
+        className="animate-fade-down fixed inset-x-0 top-0 z-50 w-full border pl-3 pr-4 py-2 transition border-black/10 bg-white/95 text-[#1b1a18] shadow-[0_12px_30px_rgba(27,26,24,0.12)]"
       >
         <div className="flex items-center justify-between gap-6 max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
@@ -172,23 +158,15 @@ export function HomePage(props: {
             </span>
           </button>
         </div>
-      </motion.nav>
+      </nav>
 
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60 bg-black/30 backdrop-blur-sm lg:hidden"
+      {menuOpen && (
+          <div
+            className="animate-fade-in fixed inset-0 z-60 bg-black/30 backdrop-blur-sm lg:hidden"
             onClick={() => setMenuOpen(false)}
           >
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 260, damping: 28 }}
-              className="absolute right-4 top-24 max-h-[calc(100vh-7rem)] w-[min(85vw,320px)] overflow-y-auto rounded-card border border-black/10 bg-white/95 p-6 shadow-[0_25px_60px_rgba(27,26,24,0.2)]"
+            <div
+              className="animate-slide-in-right absolute right-4 top-24 max-h-[calc(100vh-7rem)] w-[min(85vw,320px)] overflow-y-auto rounded-card border border-black/10 bg-white/95 p-6 shadow-[0_25px_60px_rgba(27,26,24,0.2)]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between">
@@ -220,10 +198,9 @@ export function HomePage(props: {
                 onNavigate={() => setMenuOpen(false)}
                 className="mt-5 block w-full rounded-full bg-green-base px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-green-hover"
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
 
       <header className="relative isolate min-h-[70vh] overflow-hidden lg:min-h-[82vh]">
         <HeroVideo videoRef={heroVideoRef} onPlayingChange={setHeroVideoPlaying} />
@@ -235,21 +212,16 @@ export function HomePage(props: {
           }}
         />
         <div className="relative z-10 mx-auto flex min-h-[70vh] max-w-6xl flex-col gap-10 px-6 pb-20 pt-32 text-white sm:pt-36 lg:min-h-[82vh] lg:grid lg:grid-cols-[1.1fr_0.9fr] lg:items-stretch lg:pb-28 lg:pt-32">
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col justify-center gap-8"
-          >
-            <motion.h1
-            variants={fadeUp}
-            className="text-center text-4xl text-[#f9ecda] font-semibold leading-tight font-display">
+          <div className="flex flex-col justify-center gap-8">
+            <h1
+              className="animate-fade-up text-center text-4xl text-[#f9ecda] font-semibold leading-tight font-display"
+            >
               {t("home.page.text009")}<br />
-              {t("home.page.text010")}</motion.h1>
-            <motion.div
-              variants={fadeUp}
-              className="m-auto h-24 w-24 object-cover flex justify-center items-center p-2 rounded-full overflow-hidden bg-white"
-              >
+              {t("home.page.text010")}</h1>
+            <div
+              className="animate-fade-up m-auto h-24 w-24 object-cover flex justify-center items-center p-2 rounded-full overflow-hidden bg-white"
+              style={{ animationDelay: "60ms" }}
+            >
               <Image
                 src={LOGO_SRC}
                 alt={t("home.page.text011")}
@@ -258,20 +230,23 @@ export function HomePage(props: {
                 className="h-20 w-20 object-cover mx-auto m-1"
                 priority
               />
-            </motion.div>
-            <motion.h1
-              variants={fadeUp}
-              className="text-center text-4xl font-semibold leading-tight font-display"
+            </div>
+            <h1
+              className="animate-fade-up text-center text-4xl font-semibold leading-tight font-display"
+              style={{ animationDelay: "120ms" }}
             >
-              {t("home.page.text012")}</motion.h1>
-            <motion.h2 variants={fadeUp} className="text-center text-xl font-semibold text-white/80">
-            {t("home.page.text013")}</motion.h2>
-            <motion.button
-              variants={fadeUp}
+              {t("home.page.text012")}</h1>
+            <h2
+              className="animate-fade-up text-center text-xl font-semibold text-white/80"
+              style={{ animationDelay: "180ms" }}
+            >
+              {t("home.page.text013")}</h2>
+            <button
               type="button"
+              style={{ animationDelay: "240ms" }}
               onClick={toggleHeroVideo}
               aria-label={heroVideoPlaying ? t("home.hero.stopVideo") : t("home.hero.playVideo")}
-              className="mx-auto flex items-center justify-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/70"
+              className="animate-fade-up mx-auto flex items-center justify-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/70"
             >
               {heroVideoPlaying ? (
                 <>
@@ -284,23 +259,23 @@ export function HomePage(props: {
                   <span>{t("home.page.text015")}</span>
                 </>
               )}
-            </motion.button>
-            <motion.div variants={fadeUp} className="flex lg:hidden flex-wrap gap-4 justify-center">
+            </button>
+            <div
+              className="animate-fade-up flex lg:hidden flex-wrap gap-4 justify-center"
+              style={{ animationDelay: "300ms" }}
+            >
               <a
                 href={routes.agendar}
                 className="rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover shadow-lg shadow-green-base/20"
               >
                 {t("home.page.text016")}</a>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            key="weekly"
+          <div
             id="weekly"
-            className="relative flex min-h-105 scroll-mt-40 flex-col gap-4 rounded-card border border-white/15 bg-white/10 p-5 text-white shadow-[0_25px_60px_rgba(27,26,24,0.18)] backdrop-blur sm:p-6 lg:min-h-[480px]"
+            className="animate-fade-up relative flex min-h-105 scroll-mt-40 flex-col gap-4 rounded-card border border-white/15 bg-white/10 p-5 text-white shadow-[0_25px_60px_rgba(27,26,24,0.18)] backdrop-blur sm:p-6 lg:min-h-[480px]"
+            style={{ animationDelay: "100ms" }}
           >
             <SetupWeeklySchedule onSelectClass={goToAgendar} initialBoard={props.initialBoard} />
             {/* <a> plano como en el navbar: con <Link> la segunda vez la URL ya
@@ -310,45 +285,40 @@ export function HomePage(props: {
               className="shrink-0 cursor-pointer rounded-full bg-white px-5 py-3 text-center text-sm font-semibold text-[#1b1a18] shadow-lg shadow-black/30 transition hover:-translate-y-0.5"
             >
               {t("home.page.text017")}</a>
-          </motion.div>
+          </div>
         </div>
       </header>
 
       <main className="relative mx-auto flex max-w-6xl flex-col gap-24 px-6 pb-24">
         <section id="planes" className="scroll-mt-40">
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+          <div
             className="flex flex-col gap-10"
           >
-            <motion.div variants={fadeUp} className="max-w-2xl mt-10">
+            <div className="reveal max-w-2xl mt-10">
               <p className="eyebrow eyebrow-on-light">{t("home.page.text018")}</p>
               <h2 className="mt-4 text-3xl font-semibold leading-tight md:text-4xl font-display">
                 {t("home.page.text019")}</h2>
               <p className="mt-3 text-base text-black/70">
                 {t("home.page.text020")}<br/>{t("home.page.text021")}</p>
-            </motion.div>
+            </div>
 
             {props.plans.length === 0 ? (
-              <motion.p variants={fadeUp} className="text-base text-black/70">
-                {t("home.page.text022")}</motion.p>
+              <p className="reveal text-base text-black/70">
+                {t("home.page.text022")}</p>
             ) : (
               <>
                 <div className="grid gap-8">
                   {planCards.map((plan, index) => {
-                    const image = PLAN_IMAGES[index % PLAN_IMAGES.length];
+                    const image = planCardImage(index);
                     const activePrice =
                       plan.prices.find(
                         (price) => price.label === selectedCadence[plan.id],
                       ) ?? plan.prices[0];
 
                     return (
-                      <motion.article
+                      <article
                         key={plan.id}
-                        variants={fadeUp}
-                        className="grid grid-cols-1 gap-3 overflow-hidden lg:rounded-card border border-black/10 bg-white/90 shadow-[0_20px_40px_rgba(27,26,24,0.08)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:min-h-[28rem]"
+                        className="reveal grid grid-cols-1 gap-3 overflow-hidden lg:rounded-card border border-black/10 bg-white/90 shadow-[0_20px_40px_rgba(27,26,24,0.08)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:min-h-[28rem]"
                       >
                         <div className="relative aspect-5/4 w-full overflow-hidden bg-[#d8cfc2] lg:aspect-auto lg:h-full lg:self-stretch">
                           {/* next/image en vez de background-image: AVIF/WebP al
@@ -409,52 +379,61 @@ export function HomePage(props: {
                               })}
                             </div>
                           </div>
-                          <Link
-                            href={`${routes.registry}?plan=${activePrice.planId}`}
-                            className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover"
-                          >
-                            {t("home.page.text023")}</Link>
+                          {props.loggedIn ? (
+                            <SubscribePlanButton
+                              planId={activePrice.planId}
+                              planName={`${plan.name} ${activePrice.label}`}
+                              priceLabel={activePrice.priceLabel}
+                              className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover"
+                            />
+                          ) : (
+                            <Link
+                              href={`${routes.registry}?plan=${activePrice.planId}`}
+                              className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover"
+                            >
+                              {t("home.page.text023")}</Link>
+                          )}
                         </div>
-                      </motion.article>
+                      </article>
                     );
                   })}
                 </div>
 
                 {planBars.map((plan) => (
-                  <motion.div
+                  <div
                     key={plan.id}
-                    variants={fadeUp}
-                    className="flex items-center justify-between lg:rounded-card border border-black/10 bg-white/80 px-6 py-5"
+                    className="reveal flex items-center justify-between lg:rounded-card border border-black/10 bg-white/80 px-6 py-5"
                   >
                     <p className="eyebrow eyebrow-muted">{plan.name}</p>
                     <div className="flex items-center gap-4">
                       <p className="text-2xl font-semibold text-green-base">
                         {plan.prices[0].priceLabel}
                       </p>
+                      {/* Las barras son clases sueltas: con sesión se agenda directo. */}
                       <Link
-                        href={`${routes.registry}?plan=${plan.prices[0].planId}`}
+                        href={
+                          props.loggedIn
+                            ? routes.agendar
+                            : `${routes.registry}?plan=${plan.prices[0].planId}`
+                        }
                         className="inline-flex shrink-0 items-center justify-center rounded-full bg-green-base px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-green-hover"
                       >
                         {t("home.page.text024")}</Link>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </>
             )}
-          </motion.div>
+          </div>
         </section>
 
         <AboutTeam />
         <ContentDetail />
         <section id="quienes-somos" className="scroll-mt-40">
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+          <div
             className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]"
           >
-            <motion.div variants={fadeUp} className="flex flex-col gap-6">
+            <div className="reveal flex flex-col gap-6">
               <p className="eyebrow eyebrow-on-light">{t("home.page.text025")}</p>
               <h2 className="text-3xl font-semibold leading-tight md:text-4xl font-display">
                 {t("home.page.text026")}</h2>
@@ -468,11 +447,10 @@ export function HomePage(props: {
                 <p className="mt-2 text-base text-black/70">
                   {t("home.page.text030")}</p>
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              variants={fadeUp}
-              className="relative h-80 overflow-hidden rounded-card border border-black/10 bg-[#d8cfc2] shadow-[0_25px_50px_rgba(27,26,24,0.15)] md:h-112 lg:order-last"
+            <div
+              className="reveal relative h-80 overflow-hidden rounded-card border border-black/10 bg-[#d8cfc2] shadow-[0_25px_50px_rgba(27,26,24,0.15)] md:h-112 lg:order-last"
             >
               <Image
                 src={`${process.env.NEXT_PUBLIC_S3}material.jpg`}
@@ -482,26 +460,21 @@ export function HomePage(props: {
                 className="object-cover"
               />
               <div className="absolute inset-0 bg-linear-to-t from-green-base/40 via-transparent to-transparent" />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </section>
 
         <section id="cobros" className="scroll-mt-40">
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+          <div
             className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr]"
           >
-            <motion.div variants={fadeUp} className="flex flex-col gap-6">
+            <div className="reveal flex flex-col gap-6">
               <p className="eyebrow eyebrow-on-light">{t("home.page.text032")}</p>
               <h2 className="text-3xl font-semibold leading-tight md:text-4xl font-display">
                 {t("home.page.text033")}</h2>
-              <motion.div
+              <div
                     key="bank-info"
-                    variants={fadeUp}
-                    className="flex items-start gap-5 rounded-inner border border-black/5 bg-white/80 px-6 py-5"
+                    className="reveal flex items-start gap-5 rounded-inner border border-black/5 bg-white/80 px-6 py-5"
               >
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-green-base text-sm font-semibold text-white">
                   <span>{t("home.page.text034")}</span>
@@ -516,12 +489,11 @@ export function HomePage(props: {
                     <p className="text-base text-black/70">
                       {t("home.page.text038")}</p>
                 </div>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
 
-            <motion.div
-              variants={fadeUp}
-              className="flex flex-col gap-4 rounded-card border border-black/10 bg-white/90 p-6 shadow-[0_20px_40px_rgba(27,26,24,0.1)]"
+            <div
+              className="reveal flex flex-col gap-4 rounded-card border border-black/10 bg-white/90 p-6 shadow-[0_20px_40px_rgba(27,26,24,0.1)]"
             >
               <div>
                 <p className="eyebrow eyebrow-muted">{t("home.page.text039")}</p>
@@ -548,21 +520,16 @@ export function HomePage(props: {
                 className="rounded-full bg-green-base px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-green-base/20 transition hover:-translate-y-0.5 hover:bg-green-hover"
               >
                 {t("home.page.text046")}</Link>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </section>
 
         <section id="agenda" className="scroll-mt-40">
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, amount: 0.2 }}
+          <div
             className="overflow-hidden rounded-card border border-green-base/15 shadow-[0_25px_60px_rgba(27,26,24,0.12)]"
           >
-            <motion.div
-              variants={fadeUp}
-              className="bg-green-base px-6 py-12 text-center text-white sm:py-16"
+            <div
+              className="reveal bg-green-base px-6 py-12 text-center text-white sm:py-16"
             >
               <p className="eyebrow eyebrow-on-dark mx-auto">{t("home.page.text047")}</p>
               <h2 className="mt-3 text-4xl font-semibold leading-tight font-display">
@@ -571,12 +538,11 @@ export function HomePage(props: {
                 {t("home.page.text049")}</p>
               <p className="text-base text-white/80">
                 {t("home.page.text050")}</p>
-            </motion.div>
+            </div>
 
             <div className="bg-[#f9f0e3] px-6 py-12 sm:py-16">
-              <motion.div
-                variants={fadeUp}
-                className="mx-auto w-full max-w-md overflow-hidden rounded-card border border-green-base/30 bg-white shadow-[0_20px_40px_rgba(27,26,24,0.1)]"
+              <div
+                className="reveal mx-auto w-full max-w-md overflow-hidden rounded-card border border-green-base/30 bg-white shadow-[0_20px_40px_rgba(27,26,24,0.1)]"
               >
                 <div className="border-b border-green-base/10 bg-green-base/10 px-6 py-5 text-center">
                   <h3 className="text-lg font-semibold text-green-base font-display">
@@ -597,9 +563,9 @@ export function HomePage(props: {
                       {t("home.page.text055")}</Link>
                   </p>
                 </div>
-              </motion.div>
+              </div>
             </div>
-          </motion.div>
+          </div>
         </section>
       </main>
 
@@ -646,10 +612,7 @@ export function HomePage(props: {
             </a>
           </div>
           <div className="flex flex-col">
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+            <div
               className="mt-4 rounded-card border border-white/10 bg-white/10 p-4 text-sm text-white/70 shadow-[0_20px_40px_rgba(27,26,24,0.1)] backdrop-blur"
             >
               <p className="text-amber-100">{t("home.page.text060")}</p>
@@ -667,7 +630,7 @@ export function HomePage(props: {
                   className="block w-full grayscale"
                 />
               </div>
-            </motion.div>
+            </div>
           </div>
           <div className="flex flex-col gap-2 text-sm text-white/70">
             <p className="text-amber-100">{t("home.page.text063")}</p>
@@ -686,12 +649,12 @@ export function HomePage(props: {
               {t("home.page.text069")}<br /><br />
               {t("home.page.text070")}</p>
             {props.trialUsed ? null : (
-              <motion.div variants={fadeUp} className="flex flex-wrap gap-4 justify-center">
+              <div className="reveal flex flex-wrap gap-4 justify-center">
                 <a
                 href={routes.agendar}
                 className="rounded-full bg-green-base px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-hover shadow-lg shadow-green-base/20">
                   {t("home.page.text071")}</a>
-              </motion.div>
+              </div>
             )}
           </div>
         </div>

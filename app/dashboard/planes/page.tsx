@@ -54,6 +54,9 @@ export default async function PlanesPage() {
         isUnlimited: row.isUnlimited,
         paidAmount: row.paidAmount,
         vigente: isSubscriptionCurrent(row.status, endDate),
+        // Venció, pero sus clases siguen en la cuenta para redimirse.
+        conClasesPorUsar:
+          row.status === "active" && !row.isUnlimited && (row.classesRemaining ?? 0) > 0,
       }
     })
 

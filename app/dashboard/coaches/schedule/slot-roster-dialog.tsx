@@ -76,10 +76,11 @@ export function SlotRosterDialog(props: {
                       {s.phone ?? "—"}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">{s.email}</p>
-                    {roster.canMarkAttendance ? <div className="mt-2">
+                    {/* Cualquier coach puede cubrir la clase: los botones van siempre. */}
+                    <div className="mt-2">
                       <AttendanceControls bookingId={s.bookingId} attended={s.attended}
                         catalog={roster.catalog} onSaved={() => setRevision((value) => value + 1)} />
-                    </div> : null}
+                    </div>
                   </div>
                   {s.attended === true ? (
                     <Badge className="border-green-200 bg-green-100 text-[10px] text-green-700">

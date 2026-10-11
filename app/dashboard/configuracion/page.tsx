@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -13,7 +14,7 @@ export default async function ConfiguracionPage() {
   if (session == null) redirect("/login")
 
   const role = session.user.role
-  if (role !== "admin" && role !== "root") redirect("/dashboard")
+  if (!(await canManageModule(role, "configuracion"))) redirect("/dashboard")
 
   const db = getDb()
   const [policy] = await db.select().from(schema.studioPolicy).where(eq(schema.studioPolicy.id, "main")).limit(1)

@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -28,8 +29,7 @@ export type ActionState = {
 async function assertAdminLike() {
   const session = await getSession()
   const ok =
-    session != null &&
-    (session.user.role === "admin" || session.user.role === "root")
+    session != null && (await canManageModule(session.user.role, "usuarios"))
   return { session, ok }
 }
 

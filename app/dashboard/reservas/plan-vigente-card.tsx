@@ -35,7 +35,11 @@ function includesLabel(row: PlanVigenteRow): string {
   return parts.join(" · ")
 }
 
-export function PlanVigenteCard(props: { row: PlanVigenteRow | null }) {
+export function PlanVigenteCard(props: {
+  row: PlanVigenteRow | null
+  /** Qué hacer sin plan: depende de si se le ofrecen planes o debe uno anterior. */
+  emptyHint?: string
+}) {
   if (props.row == null) {
     return (
       <div className="rounded-lg border border-dashed bg-card px-5 py-4 text-sm">
@@ -44,8 +48,8 @@ export function PlanVigenteCard(props: { row: PlanVigenteRow | null }) {
           No tienes un plan vigente
         </p>
         <p className="mt-1 text-muted-foreground">
-          Puedes reservar clases sueltas y el estudio te asigna un plan cuando lo
-          contrates.
+          {props.emptyHint ??
+            "Puedes reservar clases sueltas y el estudio te asigna un plan cuando lo contrates."}
         </p>
       </div>
     )

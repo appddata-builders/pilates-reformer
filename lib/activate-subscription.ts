@@ -22,6 +22,8 @@ export async function activateSubscriptionForUser(
     discountPct?: number | null
     discountReason?: string | null
     couponCode?: string | null
+    /** Clases sin usar del periodo vencido que se suman al nuevo. */
+    carriedClasses?: number
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const [selectedPlan] = await db
@@ -65,7 +67,9 @@ export async function activateSubscriptionForUser(
   const costPerClass = planCostPerClass(selectedPlan, finalPrice)
 
   const isUnlimited = selectedPlan.isUnlimited ?? false
-  const classesRemaining = planIncludedClasses(selectedPlan)
+  const includedClasses = planIncludedClasses(selectedPlan)
+  const classesRemaining =
+    includedClasses == null ? null : includedClasses + Math.max(0, params.carriedClasses ?? 0)
 
   const billingCycle = params.billingCycle ?? "mensual"
   const subId = crypto.randomUUID()
@@ -166,6 +170,39 @@ export async function cancelActiveSubscriptionsForUser(
   }
 
   return closed.map((row) => row.id)
+}
+
+/**
+ * Cierra como vencidos los periodos que ya terminaron y devuelve las clases
+ * que les quedaban, para sumarlas al periodo nuevo. Lo que la alumna pagó no se
+ * pierde porque el plan venza: se redime después o pasa al siguiente plan.
+ */
+export async function closeExpiredSubscriptionsCarryingClasses(
+  db: AnyDb,
+  userId: string,
+): Promise<number> {
+  const active = await db
+    .select({
+      status: schema.subscription.status,
+      endDate: schema.subscription.endDate,
+      classesRemaining: schema.subscription.classesRemaining,
+      isUnlimited: schema.subscription.isUnlimited,
+    })
+    .from(schema.subscription)
+    .where(
+      and(
+        eq(schema.subscription.userId, userId),
+        eq(schema.subscription.status, "active"),
+      ),
+    )
+
+  const carried = active.reduce((sum, row) => {
+    if (row.isUnlimited === true || isSubscriptionCurrent(row.status, row.endDate)) return sum
+    return sum + Math.max(0, row.classesRemaining ?? 0)
+  }, 0)
+
+  await cancelActiveSubscriptionsForUser(db, userId, { status: "expired" })
+  return carried
 }
 
 /**
@@ -292,13 +329,27 @@ export async function applyUserPlan(
     if (isSubscriptionCurrent(active.status, active.endDate)) {
       return { ok: true }
     }
-    await cancelActiveSubscriptionsForUser(db, params.userId, { status: "expired" })
+    const carriedClasses = await closeExpiredSubscriptionsCarryingClasses(db, params.userId)
     // Una renovación arranca hoy a propósito: heredar la fecha del formulario
     // podía abrir un periodo que nacía vencido y pedía renovarse otra vez.
     return activateSubscriptionForUser(db, {
       userId: params.userId,
       planId,
       billingCycle: params.billingCycle,
+      carriedClasses,
+    })
+  }
+
+  if (active != null && !isSubscriptionCurrent(active.status, active.endDate)) {
+    // Periodo vencido y plan distinto: es una renovación con otro plan. Las
+    // clases que quedaban pasan al nuevo y el cobro anterior sigue vivo.
+    const carriedClasses = await closeExpiredSubscriptionsCarryingClasses(db, params.userId)
+    return activateSubscriptionForUser(db, {
+      userId: params.userId,
+      planId,
+      billingCycle: params.billingCycle,
+      startDate: params.startDate,
+      carriedClasses,
     })
   }
 

@@ -178,14 +178,74 @@
   border-radius: var(--r-inner);
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
+/*
+ * Animaciones del inicio, todas en CSS y sólo con opacity/transform, que el
+ * navegador resuelve en la GPU sin tocar el hilo principal. Antes eran de
+ * framer-motion: dejaban el contenido en opacity 0 hasta que hidrataba el JS y
+ * cargaban la librería entera sólo para esto. Recorridos cortos (8-10 px) para
+ * que se sientan suaves y no pesadas.
+ */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 @layer utilities {
-  .animate-float {
-    animation: float 9s ease-in-out infinite;
+  .animate-fade-up {
+    animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade-down {
+    animation: fade-down 0.3s ease-out both;
+  }
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out both;
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+/*
+ * Aparición al hacer scroll sin JavaScript: la animación avanza con el scroll
+ * (animation-timeline: view()) y corre fuera del hilo principal. Donde el
+ * navegador no la soporta el contenido simplemente se ve, nunca queda oculto.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 30%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-fade-down,
+  .animate-fade-in,
+  .animate-slide-in-right {
+    animation: none;
   }
 }
 

@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
@@ -12,10 +13,6 @@ export type ActionState = {
   success: boolean
   error?: string
   fieldErrors?: Record<string, string[]>
-}
-
-function canManageClases(role: string | undefined): boolean {
-  return role === "admin" || role === "root"
 }
 
 const slotSchema = z.object({
@@ -82,7 +79,7 @@ export async function createSlotAction(
 ): Promise<ActionState> {
   const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
-  if (!session || !canManageClases(role)) {
+  if (!session || !(await canManageModule(role, "clases"))) {
     return { success: false, error: "No autorizado" }
   }
 
@@ -115,7 +112,7 @@ export async function updateSlotAction(
 ): Promise<ActionState> {
   const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
-  if (!session || !canManageClases(role)) {
+  if (!session || !(await canManageModule(role, "clases"))) {
     return { success: false, error: "No autorizado" }
   }
 
@@ -154,7 +151,7 @@ export async function deleteSlotAction(
 ): Promise<ActionState> {
   const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
-  if (!session || !canManageClases(role)) {
+  if (!session || !(await canManageModule(role, "clases"))) {
     return { success: false, error: "No autorizado" }
   }
 
@@ -177,7 +174,7 @@ export async function toggleSlotAction(
 ): Promise<ActionState> {
   const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
-  if (!session || !canManageClases(role)) {
+  if (!session || !(await canManageModule(role, "clases"))) {
     return { success: false, error: "No autorizado" }
   }
 
@@ -203,7 +200,7 @@ export async function setSlotWeekAvailabilityAction(
 ): Promise<ActionState> {
   const session = await getSession()
   const role = (session?.user as { role?: string } | undefined)?.role
-  if (!session || !canManageClases(role)) {
+  if (!session || !(await canManageModule(role, "clases"))) {
     return { success: false, error: "No autorizado" }
   }
 

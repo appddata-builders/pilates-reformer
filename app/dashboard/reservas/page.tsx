@@ -2,14 +2,16 @@ export const dynamic = "force-dynamic"
 
 import { getAttendanceCatalog } from "@/lib/coach-attendance"
 import { AttendanceControls } from "../coaches/attendance/attendance-controls"
-import { coachTeachesSlot } from "@/lib/schedule-instructor"
 import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, asc, count, eq, gte, inArray, isNull, lte } from "drizzle-orm"
 import { isAlumnoRole, getSessionUserId } from "@/lib/alumno-scope"
-import { evaluateStudentSelfRelease } from "@/lib/booking-rules"
-import { classStartFromBooking } from "@/lib/cancellation-policy"
+import {
+  classStartFromBooking,
+  evaluateStudentRelease,
+  loadStudioCancellationPolicy,
+} from "@/lib/cancellation-policy"
 import {
   isSubscriptionCurrent,
   pickPrimarySubscription,
@@ -24,6 +26,10 @@ import Link from "next/link"
 import { ReservaCard } from "./reserva-card"
 import { PendingPaymentsPanel, type PendingPaymentRow } from "./pending-payments-panel"
 import { PlanVigenteCard, type PlanVigenteRow } from "./plan-vigente-card"
+import { PlanOffers } from "./plan-offers"
+import { getPlanRequestState } from "@/lib/plan-requests"
+import { loadReservacionesPlans } from "@/lib/site/public-plans.server"
+import type { PublicPlan } from "@/lib/site/plans"
 
 function isAdminOrRoot(role: string) {
   return role === "admin" || role === "root"
@@ -58,11 +64,9 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
   const db = getDb()
   const attendanceCatalog = isCoach || isAdminRoot ? await getAttendanceCatalog(db) : []
 
-  let alumnoSubscription: {
-    status: string
-    startDate: Date
-    endDate: Date
-  } | null = null
+  // Con plan, liberar sigue la anticipación mínima; sin plan, basta que no empiece.
+  let alumnoHasPlan = false
+  const cancellationPolicy = isAlumno ? await loadStudioCancellationPolicy(db) : null
   let planVigente: PlanVigenteRow | null = null
 
   if (isAlumno && userId != null) {
@@ -89,22 +93,14 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
       )
     const primary = pickPrimarySubscription(subs)
     if (primary != null) {
-      const startDate =
-        primary.startDate instanceof Date
-          ? primary.startDate
-          : new Date(primary.startDate as unknown as number)
       const endDate =
         primary.endDate instanceof Date
           ? primary.endDate
           : new Date(primary.endDate as unknown as number)
-      alumnoSubscription = {
-        status: primary.status,
-        startDate,
-        endDate,
-      }
+      alumnoHasPlan = true
       // Un periodo vencido con clases pagadas sin tomar sigue siendo útil: se
-      // muestra en ámbar para que sepa que las puede usar cuadrando con el
-      // estudio. Vencido y sin clases sí desaparece.
+      // muestra en ámbar para que sepa que todavía las puede usar. Vencido y
+      // sin clases sí desaparece.
       const vigente = isSubscriptionCurrent(primary.status, endDate)
       const restantes = primary.isUnlimited === true ? null : (primary.classesRemaining ?? 0)
       if (vigente || (restantes != null && restantes > 0)) {
@@ -121,6 +117,25 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
     }
   }
 
+  // Sin plan vigente -la primera vez que entra, o cuando el suyo terminó- se le
+  // ofrecen los planes de la landing para suscribirse desde aquí. Sólo los que
+  // de verdad se pueden contratar; si debe un plan anterior, primero lo paga.
+  let planOffers: PublicPlan[] = []
+  let planDebt = 0
+  if (isAlumno && userId != null) {
+    const request = await getPlanRequestState(db, userId)
+    planDebt = request.pendingPlanDebt
+    if (request.current == null && planDebt === 0) {
+      const requestable = new Set(request.plans.map((plan) => plan.id))
+      planOffers = (await loadReservacionesPlans())
+        .map((plan) => ({
+          ...plan,
+          prices: plan.prices.filter((price) => requestable.has(price.planId)),
+        }))
+        .filter((plan) => plan.prices.length > 0)
+    }
+  }
+
   let pendingPayments: PendingPaymentRow[] = []
   if (isAlumno && userId != null) {
     const rows = await db
@@ -129,8 +144,10 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
         amount: schema.payment.amount,
         concept: schema.payment.concept,
         createdAt: schema.payment.createdAt,
+        planStartDate: schema.subscription.startDate,
       })
       .from(schema.payment)
+      .leftJoin(schema.subscription, eq(schema.payment.subscriptionId, schema.subscription.id))
       .where(
         and(
           eq(schema.payment.userId, userId),
@@ -148,6 +165,12 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
         row.createdAt instanceof Date
           ? row.createdAt
           : new Date(row.createdAt as unknown as number),
+      planStartDate:
+        row.planStartDate == null
+          ? null
+          : row.planStartDate instanceof Date
+            ? row.planStartDate
+            : new Date(row.planStartDate as unknown as number),
     }))
   }
 
@@ -237,17 +260,19 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
       r.bookingDate instanceof Date
         ? r.bookingDate
         : new Date(r.bookingDate as unknown as number)
-    if (r.trialClass === true || individualBookingIds.has(r.id) || alumnoSubscription == null) {
+    if (
+      r.trialClass === true ||
+      individualBookingIds.has(r.id) ||
+      !alumnoHasPlan ||
+      cancellationPolicy == null
+    ) {
       return now < classStartFromBooking(bookingDate, r.startTime)
     }
-    const check = evaluateStudentSelfRelease({
-      bookingDate,
-      subscriptionStatus: alumnoSubscription.status,
-      subscriptionStartDate: alumnoSubscription.startDate,
-      subscriptionEndDate: alumnoSubscription.endDate,
+    return evaluateStudentRelease(
       now,
-    })
-    return check.ok
+      classStartFromBooking(bookingDate, r.startTime),
+      cancellationPolicy,
+    ).ok
   }
 
   const description = isAlumno
@@ -276,9 +301,22 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
         ) : null}
       </PageHeader>
 
-      {isAlumno ? <PlanVigenteCard row={planVigente} /> : null}
+      {isAlumno ? (
+        <PlanVigenteCard
+          row={planVigente}
+          emptyHint={
+            planDebt > 0
+              ? "Para suscribirte a un plan, primero paga en el estudio el que quedó pendiente."
+              : planOffers.length > 0
+                ? "Suscríbete a uno de los planes de abajo o reserva clases sueltas."
+                : undefined
+          }
+        />
+      ) : null}
 
-      <PendingPaymentsPanel rows={pendingPayments} />
+      {isAlumno ? <PlanOffers plans={planOffers} /> : null}
+
+      <PendingPaymentsPanel rows={pendingPayments} userName={session?.user.name ?? ""} />
 
       <form
         data-tour="reservas-filter"
@@ -348,7 +386,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
                 }
                 cancelMode={isAlumno ? "self" : "admin"}
               />
-              {r.status === "confirmed" && (isAdminRoot || (isCoach && coachTeachesSlot(r, session?.user.name ?? ""))) ? (
+              {r.status === "confirmed" && (isAdminRoot || isCoach) ? (
                 <div className="space-y-2 border rounded-md p-3 mt-2">
                   <p className="text-xs text-muted-foreground">{r.userEmail}</p>
                   <AttendanceControls bookingId={r.id} attended={r.attended} catalog={attendanceCatalog} />

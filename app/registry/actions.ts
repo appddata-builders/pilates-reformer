@@ -11,6 +11,7 @@ import {
 import { sendWelcomeNotification } from "@/lib/welcome-message"
 import { CognitoPasswordError, EmailTakenError } from "@/lib/cognito"
 import { createUserAccount } from "@/lib/user-accounts"
+import { requestPlan } from "@/lib/plan-requests"
 import {
   canAccessHiddenRegistry,
   hiddenRegistrySchema,
@@ -26,6 +27,10 @@ export type RegistryActionState = {
   fieldErrors?: Record<string, string[]>
   /** Correo de la cuenta creada, para pedir el código de confirmación. */
   email?: string
+  /** El plan elegido quedó activo con la cuenta. */
+  planMessage?: string
+  /** La cuenta se creó, pero el plan elegido no se pudo activar. */
+  planError?: string
 }
 
 function getRegistryTokenFromForm(formData: FormData): string | undefined {
@@ -33,6 +38,13 @@ function getRegistryTokenFromForm(formData: FormData): string | undefined {
   if (typeof raw !== "string") return undefined
   const trimmed = raw.trim()
   return trimmed === "" ? undefined : trimmed
+}
+
+function getPlanIdFromForm(formData: FormData): string | null {
+  const raw = formData.get("planId")
+  if (typeof raw !== "string") return null
+  const trimmed = raw.trim()
+  return trimmed === "" ? null : trimmed
 }
 
 export async function hiddenRegistryAction(
@@ -52,7 +64,7 @@ export async function hiddenRegistryAction(
   if (!isRegistryPolicyComplete(formData)) {
     return {
       success: false,
-      error: "Debes descargar el acuerdo y aceptar las políticas para registrarte",
+      error: "Debes aceptar las políticas, términos y condiciones para registrarte",
     }
   }
 
@@ -139,7 +151,23 @@ export async function hiddenRegistryAction(
       estudio: policy?.studioName ?? "Pilates Studio",
     })
 
-    return { success: true, email }
+    // El plan se activa aquí, en el servidor y junto con la cuenta, y no al
+    // confirmar el código: así no se pierde si cierra la pantalla y confirma
+    // después desde el login. Un fallo del plan no deshace la cuenta.
+    const planId = getPlanIdFromForm(formData)
+    if (planId == null) return { success: true, email }
+    try {
+      const plan = await requestPlan(db, { userId: created.id, planId })
+      return plan.ok
+        ? { success: true, email, planMessage: plan.message }
+        : { success: true, email, planError: plan.error }
+    } catch {
+      return {
+        success: true,
+        email,
+        planError: "No pudimos activar tu plan. Puedes suscribirte al agendar tu primera clase.",
+      }
+    }
   } catch (e) {
     if (e instanceof EmailTakenError) {
       return {

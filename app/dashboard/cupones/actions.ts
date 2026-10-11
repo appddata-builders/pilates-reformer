@@ -4,6 +4,7 @@ import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import { eq } from "drizzle-orm"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { normalizeCouponCode } from "@/lib/coupon-pricing"
@@ -17,8 +18,7 @@ export type ActionState = {
 async function assertStaff() {
   const session = await getSession()
   const ok =
-    session != null &&
-    (session.user.role === "admin" || session.user.role === "root")
+    session != null && (await canManageModule(session.user.role, "cupones"))
   return { session, ok }
 }
 

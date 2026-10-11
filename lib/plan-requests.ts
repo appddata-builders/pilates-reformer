@@ -3,7 +3,7 @@ import type { AnyDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import {
   activateSubscriptionForUser,
-  cancelActiveSubscriptionsForUser,
+  closeExpiredSubscriptionsCarryingClasses,
 } from "@/lib/activate-subscription"
 import { INDIVIDUAL_CLASS_PLAN_ID } from "@/lib/class-charge"
 import { createNotification } from "@/lib/notifications"
@@ -17,7 +17,8 @@ import { isSubscriptionCurrent, pickPrimarySubscription } from "@/lib/subscripti
  * - no se pide ni se renueva un plan si se debe el anterior (las clases
  *   individuales pendientes no cuentan);
  * - se renueva cuando termina el periodo, igual que cuando lo renueva el admin:
- *   dos periodos activos a la vez confundirían qué plan cubre cada reserva.
+ *   dos periodos activos a la vez confundirían qué plan cubre cada reserva;
+ * - las clases que quedaron sin usar del periodo vencido pasan al nuevo.
  */
 
 export type RequestablePlan = {
@@ -79,6 +80,8 @@ async function loadPrimarySubscription(db: AnyDb, userId: string) {
       status: schema.subscription.status,
       startDate: schema.subscription.startDate,
       endDate: schema.subscription.endDate,
+      classesRemaining: schema.subscription.classesRemaining,
+      isUnlimited: schema.subscription.isUnlimited,
     })
     .from(schema.subscription)
     .innerJoin(schema.plan, eq(schema.subscription.planId, schema.plan.id))
@@ -108,7 +111,14 @@ export type PlanRequestState = {
   /** Plan con periodo en curso: no se pide otro hasta que termine. */
   current: { planName: string; endDate: Date } | null
   /** Plan cuyo periodo ya terminó: se puede renovar o elegir otro. */
-  renewable: { planId: string; planName: string; endDate: Date; available: boolean } | null
+  renewable: {
+    planId: string
+    planName: string
+    endDate: Date
+    available: boolean
+    /** Clases sin usar; se pueden tomar y se suman al renovar. */
+    classesLeft: number
+  } | null
 }
 
 export async function getPlanRequestState(db: AnyDb, userId: string): Promise<PlanRequestState> {
@@ -130,6 +140,7 @@ export async function getPlanRequestState(db: AnyDb, userId: string): Promise<Pl
       planName: primary.planName,
       endDate,
       available: plans.some((p) => p.id === primary.planId),
+      classesLeft: primary.isUnlimited ? 0 : Math.max(0, primary.classesRemaining ?? 0),
     }
   }
   return state
@@ -179,14 +190,17 @@ export async function requestPlan(
     }
   }
 
-  // El periodo anterior terminó: se cierra como vencido, no como baja.
-  if (state.renewable != null) {
-    await cancelActiveSubscriptionsForUser(db, params.userId, { status: "expired" })
-  }
+  // El periodo anterior terminó: se cierra como vencido, no como baja, y sus
+  // clases sin usar pasan al plan nuevo.
+  const carriedClasses =
+    state.renewable != null
+      ? await closeExpiredSubscriptionsCarryingClasses(db, params.userId)
+      : 0
 
   const activated = await activateSubscriptionForUser(db, {
     userId: params.userId,
     planId: plan.id,
+    carriedClasses,
   })
   if (!activated.ok) return { ok: false, error: activated.error }
 
@@ -194,12 +208,16 @@ export async function requestPlan(
   const endLabel = created != null ? formatDay(toDate(created.endDate)) : ""
   const name = user.name?.trim() || "Usuario"
   const isRenewal = state.renewable != null && state.renewable.planId === plan.id
+  const carriedNote =
+    carriedClasses > 0
+      ? ` Se sumaron ${carriedClasses === 1 ? "1 clase" : `${carriedClasses} clases`} que te quedaban de tu plan anterior.`
+      : ""
 
   await createNotification(db, {
     userId: params.userId,
     type: "plan_requested",
     title: isRenewal ? "Renovaste tu plan" : "Tu plan quedó activo",
-    body: `Hola ${name}, ${plan.name} está activo hasta el ${endLabel}. Ya puedes reservar. Quedó pendiente el pago de ${formatMxn(plan.priceMxn)}: págalo en el estudio y ahí lo registran.`,
+    body: `Hola ${name}, ${plan.name} está activo hasta el ${endLabel}. Ya puedes reservar.${carriedNote} Quedó pendiente el pago de ${formatMxn(plan.priceMxn)}: págalo en el estudio y ahí lo registran.`,
   })
   await notifyStaff(
     db,
@@ -209,7 +227,7 @@ export async function requestPlan(
 
   return {
     ok: true,
-    message: `${plan.name} quedó activo hasta el ${endLabel}. Paga ${formatMxn(plan.priceMxn)} en el estudio.`,
+    message: `${plan.name} quedó activo hasta el ${endLabel}.${carriedNote} Paga ${formatMxn(plan.priceMxn)} en el estudio.`,
   }
 }
 

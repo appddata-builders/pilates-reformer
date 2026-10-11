@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Image from "next/image";
 import { FaHeart } from "react-icons/fa6";
 import { useTranslation } from "@/lib/text/text-provider";
@@ -16,12 +15,8 @@ export default function ContentDetail() {
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(47,107,95,0.12),transparent_55%)]" />
       <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6 }}
-          className="relative overflow-hidden rounded-card h-90 md:h-120 border border-black/10 bg-[#d8cfc2] shadow-[0_25px_50px_rgba(27,26,24,0.15)]"
+        <div
+          className="reveal relative overflow-hidden rounded-card h-90 md:h-120 border border-black/10 bg-[#d8cfc2] shadow-[0_25px_50px_rgba(27,26,24,0.15)]"
         >
           {/* next/image en vez de background-image: sirve AVIF/WebP al tamaño
               real del hueco y carga en diferido. El original pesa 5 MB. */}
@@ -43,14 +38,10 @@ export default function ContentDetail() {
                 {t("content.detail.text003")}</p>
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6, delay: 0.05 }}
-          className="flex flex-col gap-6"
+        <div
+          className="reveal flex flex-col gap-6"
         >
           <div>
             <p className="eyebrow eyebrow-on-light">{t("content.detail.text004")}</p>
@@ -70,7 +61,7 @@ export default function ContentDetail() {
             >
               {t("content.detail.text008")}</a>
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

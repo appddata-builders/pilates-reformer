@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { eq } from "drizzle-orm"
 import { getSession } from "@/lib/session"
+import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { sendPaymentConfirmedNotification } from "@/lib/payment-notifications"
@@ -14,16 +15,12 @@ export type ActionState = {
   fieldErrors?: Record<string, string[]>
 }
 
-function isAdminOrRoot(role: string | null | undefined) {
-  return role === "admin" || role === "root"
-}
-
 export async function confirmPaymentAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const session = await getSession()
-  if (!session || !isAdminOrRoot(session.user.role)) {
+  if (!session || !(await canManageModule(session.user.role, "pagos"))) {
     return { success: false, error: "No autorizado" }
   }
 
@@ -99,7 +96,7 @@ export async function cancelPaymentAction(
   formData: FormData,
 ): Promise<ActionState> {
   const session = await getSession()
-  if (!session || !isAdminOrRoot(session.user.role)) {
+  if (!session || !(await canManageModule(session.user.role, "pagos"))) {
     return { success: false, error: "No autorizado" }
   }
 
