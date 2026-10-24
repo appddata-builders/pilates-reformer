@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm"
 import { normalizeBirthdateInput } from "@/lib/birthdate"
 import { sendWelcomeNotification } from "@/lib/welcome-message"
 import { applyUserPlan } from "@/lib/activate-subscription"
+import { checkCoupon, previewCoupon, type CouponPreview } from "@/lib/coupons"
 import { revokeUserSessions } from "@/lib/revoke-user-sessions"
 import { sendStudioPasswordReset } from "@/lib/reset-user-password"
 import { routes } from "@/lib/routes"
@@ -31,6 +32,7 @@ const createAlumnoSchema = z.object({
     .enum(["mensual", "quincenal", "semanal", "efectivo"])
     .optional(),
   startDate: z.string().optional(),
+  couponCode: z.string().optional(),
 })
 
 const updateAlumnoSchema = z.object({
@@ -45,6 +47,7 @@ const updateAlumnoSchema = z.object({
     .enum(["mensual", "quincenal", "semanal", "efectivo"])
     .optional(),
   startDate: z.string().optional(),
+  couponCode: z.string().optional(),
   enabled: z.enum(["true", "false"]).optional(),
   role: z.enum(["alumno", "coach"]).optional(),
 })
@@ -83,6 +86,7 @@ export async function createAlumnoAction(
     planId: formData.get("planId") || undefined,
     billingCycle: formData.get("billingCycle") || undefined,
     startDate: formData.get("startDate") || undefined,
+    couponCode: formData.get("couponCode") || undefined,
   })
   if (!parsed.success) {
     return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
@@ -105,8 +109,20 @@ export async function createAlumnoAction(
     }
   }
 
+  const db = getDb()
+
+  // El cupón se revisa antes de dar de alta la cuenta: si no aplica, el admin
+  // lo corrige y reintenta sin toparse con "el correo ya está registrado".
+  const couponCode = parsed.data.couponCode?.trim() || null
+  if (couponCode != null) {
+    if (planId === "") {
+      return { success: false, error: "Elige un plan para aplicar el cupón" }
+    }
+    const coupon = await checkCoupon(db, couponCode, { userId: null })
+    if (!coupon.ok) return { success: false, error: coupon.message }
+  }
+
   try {
-    const db = getDb()
     const row = await createUserAccount(db, {
       name: parsed.data.name,
       email: parsed.data.email,
@@ -137,6 +153,7 @@ export async function createAlumnoAction(
         planId,
         billingCycle: parsed.data.billingCycle ?? "mensual",
         startDate: planStart,
+        couponCode,
       })
       if (!planResult.ok) {
         return { success: false, error: planResult.error }
@@ -179,6 +196,7 @@ export async function updateAlumnoAction(
     planId: formData.get("planId") ?? undefined,
     billingCycle: formData.get("billingCycle") || undefined,
     startDate: formData.get("startDate") || undefined,
+    couponCode: formData.get("couponCode") || undefined,
     enabled: formData.get("enabled") ?? undefined,
     role: formData.get("role") || undefined,
   })
@@ -264,6 +282,7 @@ export async function updateAlumnoAction(
         billingCycle: parsed.data.billingCycle ?? "mensual",
         startDate: planStart,
         actor: session?.user?.name ?? session?.user?.id ?? "admin",
+        couponCode: parsed.data.couponCode,
       })
       if (!planResult.ok) {
         return { success: false, error: planResult.error }
@@ -297,6 +316,17 @@ export async function updateAlumnoAction(
     }
     return { success: false, error: msg }
   }
+}
+
+/** Precio con cupón para el formulario de plan; `userId` al editar una cuenta. */
+export async function previewPlanCouponAction(
+  code: string,
+  planId: string,
+  userId: string | null,
+): Promise<CouponPreview> {
+  const { ok } = await assertAdminLike()
+  if (!ok) return { ok: false, message: "No autorizado" }
+  return previewCoupon(getDb(), { code, planId, userId })
 }
 
 export async function toggleUserEnabledAction(

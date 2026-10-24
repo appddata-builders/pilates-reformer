@@ -1,13 +1,13 @@
 import type { AnyDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { and, eq, gte, lte, sql } from "drizzle-orm"
-import { withAsyncTransaction } from "@/lib/db/async-transaction"
+import { withResultTransaction } from "@/lib/db/async-transaction"
 import {
   computeSubscriptionEndDate,
   subscriptionEndOfDay,
   toSubscriptionLocalDate,
 } from "@/lib/subscription-dates"
-import { incrementCouponUsedCount, resolveCouponForPrice } from "@/lib/coupons"
+import { checkCoupon, priceWithCoupon } from "@/lib/coupons"
 import { isSubscriptionCurrent, pickPrimarySubscription } from "@/lib/subscription-display"
 import { voidPendingPaymentsForSubscriptions } from "@/lib/payment-cancellation"
 import { createNotification } from "@/lib/notifications"
@@ -26,7 +26,7 @@ export async function activateSubscriptionForUser(
     /** Clases sin usar del periodo vencido que se suman al nuevo. */
     carriedClasses?: number
   },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; amount: number } | { ok: false; error: string }> {
   const [selectedPlan] = await db
     .select()
     .from(schema.plan)
@@ -48,18 +48,19 @@ export async function activateSubscriptionForUser(
   let discountReason = params.discountReason ?? null
   let finalPrice =
     discountPct != null ? selectedPlan.priceMxn * (1 - discountPct) : selectedPlan.priceMxn
-  let couponIdToIncrement: string | null = null
+  let couponId: string | null = null
 
   const couponCode = params.couponCode?.trim() ?? ""
   if (couponCode !== "") {
-    const resolved = await resolveCouponForPrice(db, couponCode, selectedPlan.priceMxn)
-    if (!resolved.ok) {
-      return { ok: false, error: resolved.message }
+    const check = await checkCoupon(db, couponCode, { userId: params.userId, lock: true })
+    if (!check.ok) {
+      return { ok: false, error: check.message }
     }
-    finalPrice = resolved.finalPrice
-    discountPct = resolved.discountPct
-    discountReason = resolved.discountReason
-    couponIdToIncrement = resolved.coupon.id
+    const priced = priceWithCoupon(check.coupon, selectedPlan.priceMxn)
+    finalPrice = priced.finalPrice
+    discountPct = priced.discountPct
+    discountReason = priced.discountReason
+    couponId = check.coupon.id
   }
 
   // Un plan mensual no trae `totalClasses`: su cupo sale de los días por semana
@@ -95,6 +96,7 @@ export async function activateSubscriptionForUser(
     billingCycle,
     discountPct,
     discountReason,
+    couponId,
     costPerClass,
     paidAmount: finalPrice,
   })
@@ -109,11 +111,7 @@ export async function activateSubscriptionForUser(
     concept: `Suscripción: ${selectedPlan.name}${discountNote}`,
   })
 
-  if (couponIdToIncrement != null) {
-    await incrementCouponUsedCount(db, couponIdToIncrement)
-  }
-
-  return { ok: true }
+  return { ok: true, amount: finalPrice }
 }
 
 /**
@@ -286,18 +284,22 @@ type ApplyUserPlanParams = {
   startDate?: Date
   /** Queda registrado en el pago que se anula al dar de baja el plan. */
   actor?: string
+  /** Sólo aplica cuando se abre un periodo nuevo: asignar, cambiar o renovar. */
+  couponCode?: string | null
 }
 
 /**
  * Asigna, renueva, cambia o da de baja el plan desde administración. Bloquea a
  * la alumna durante la operación: dos envíos del formulario leían el mismo
- * estado y podían abrir dos planes con dos cobros.
+ * estado y podían abrir dos planes con dos cobros. Si el plan nuevo no se
+ * puede abrir -un cupón que ya no aplica- se deshace todo y el anterior sigue
+ * como estaba.
  */
 export async function applyUserPlan(
   db: AnyDb,
   params: ApplyUserPlanParams,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  return withAsyncTransaction(db, async (tx) => {
+  return withResultTransaction(db, async (tx) => {
     await tx.update(schema.user)
       .set({ updatedAt: sql`${schema.user.updatedAt}` })
       .where(eq(schema.user.id, params.userId))
@@ -328,6 +330,11 @@ async function applyUserPlanLocked(
     )
 
   const active = pickPrimarySubscription(activeSubs)
+  const couponCode = params.couponCode?.trim() || null
+
+  if (planId === "" && couponCode != null) {
+    return { ok: false, error: "Elige un plan para aplicar el cupón" }
+  }
 
   if (planId === "") {
     if (active != null) {
@@ -347,6 +354,12 @@ async function applyUserPlanLocked(
     // periodo nuevo dura lo que diga el plan (7, 15 o 30 días) y trae su propio
     // cobro pendiente, que se suma a lo que la alumna ya debiera.
     if (isSubscriptionCurrent(active.status, active.endDate)) {
+      if (couponCode != null) {
+        return {
+          ok: false,
+          error: "Ese plan sigue vigente: el cupón se aplica al asignar, cambiar o renovar un plan",
+        }
+      }
       return { ok: true }
     }
     const carriedClasses = await closeExpiredSubscriptionsCarryingClasses(db, params.userId)
@@ -357,6 +370,7 @@ async function applyUserPlanLocked(
       planId,
       billingCycle: params.billingCycle,
       carriedClasses,
+      couponCode,
     })
   }
 
@@ -370,6 +384,7 @@ async function applyUserPlanLocked(
       billingCycle: params.billingCycle,
       startDate: params.startDate,
       carriedClasses,
+      couponCode,
     })
   }
 
@@ -448,5 +463,6 @@ async function applyUserPlanLocked(
     billingCycle: params.billingCycle,
     startDate: params.startDate,
     carriedClasses,
+    couponCode,
   })
 }

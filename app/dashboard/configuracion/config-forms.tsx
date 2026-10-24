@@ -26,20 +26,12 @@ function validTabsForRole(isRoot: boolean): string[] {
 export type StudioPolicyFormValues = {
   studioName: string
   logoUrl: string | null
-  brandColor: string
-  maxCapacity: number
-  cancelHours: number
   cancelMinutes: number
-  lateCancelPenalty: boolean
-  noShowPenalty: boolean
-  maxBookingsPerDay: number
-  bookingWindowDays: number
   bookingWindowMinutes: number
   alertLastClassThreshold: number
   alertDaysBeforeExpiry: number
   welcomeMessage: string
   birthdayMessage: string
-  maintenanceMode: boolean
 }
 
 export function ConfigFormsClient(props: {
@@ -114,10 +106,6 @@ export function ConfigFormsClient(props: {
                   <Label className="py-1" htmlFor="studioName">Nombre del estudio</Label>
                   <Input className="py-1" id="studioName" name="studioName" required defaultValue={props.policy.studioName} />
                 </div>
-                <div className="flex flex-col gap-1 py-1">
-                  <Label className="py-1" htmlFor="brandColor">Color de marca (hex)</Label>
-                  <Input className="py-1" id="brandColor" name="brandColor" required defaultValue={props.policy.brandColor} />
-                </div>
                 <div className="py-1 pt-4">
                   <Button
                     type="submit"
@@ -140,57 +128,11 @@ export function ConfigFormsClient(props: {
               <DbActionForm action={saveConfigAction} kind="update" className="space-y-4">
                 <input type="hidden" name="tab" value="booking" />
                 <div className="flex flex-col gap-1 py-1">
-                  <Label className="py-1" htmlFor="maxCapacity">Capacidad máxima por clase</Label>
-                  <Input className="py-1" id="maxCapacity" name="maxCapacity" type="number" min={1} required defaultValue={props.policy.maxCapacity} />
-                </div>
-                <div className="flex flex-col gap-1 py-1">
                   <Label className="py-1" htmlFor="cancelMinutes">Anticipación mínima para cancelar (minutos)</Label>
                   <p className="text-xs text-muted-foreground py-1">
                     Con menos tiempo no se puede cancelar. El cierre de reservas nuevas se controla con la ventana en minutos.
                   </p>
                   <Input className="py-1" id="cancelMinutes" name="cancelMinutes" type="number" min={0} step={15} required defaultValue={props.policy.cancelMinutes} />
-                </div>
-                <div className="flex flex-col gap-1 py-1">
-                  <Label className="py-1" htmlFor="lateCancelPenalty">
-                    Descontar clase si cancela tarde
-                  </Label>
-                  <p className="text-xs text-muted-foreground py-1">
-                    Reservado para políticas futuras. Hoy, dentro de la ventana mínima la cancelación está bloqueada.
-                  </p>
-                  <select
-                    id="lateCancelPenalty"
-                    name="lateCancelPenalty"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                    defaultValue={props.policy.lateCancelPenalty ? "true" : "false"}
-                  >
-                    <option value="true">Sí, descontar clase</option>
-                    <option value="false">No descontar</option>
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1 py-1">
-                  <Label className="py-1" htmlFor="noShowPenalty">
-                    Descontar clase si reservó y no asistió
-                  </Label>
-                  <p className="text-xs text-muted-foreground py-1">
-                    La clase ya se descuenta al reservar. Marcar no-show solo registra asistencia.
-                  </p>
-                  <select
-                    id="noShowPenalty"
-                    name="noShowPenalty"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                    defaultValue={props.policy.noShowPenalty ? "true" : "false"}
-                  >
-                    <option value="true">Sí, descontar clase</option>
-                    <option value="false">No descontar</option>
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1 py-1">
-                  <Label className="py-1" htmlFor="maxBookingsPerDay">Máximo de reservas por día por usuario</Label>
-                  <Input className="py-1" id="maxBookingsPerDay" name="maxBookingsPerDay" type="number" min={1} required defaultValue={props.policy.maxBookingsPerDay} />
-                </div>
-                <div className="flex flex-col gap-1 py-1">
-                  <Label className="py-1" htmlFor="bookingWindowDays">Ventana de reserva (días)</Label>
-                  <Input className="py-1" id="bookingWindowDays" name="bookingWindowDays" type="number" min={1} required defaultValue={props.policy.bookingWindowDays} />
                 </div>
                 <div className="flex flex-col gap-1 py-1">
                   <Label className="py-1" htmlFor="bookingWindowMinutes">Ventana de reserva (minutos)</Label>
@@ -222,6 +164,9 @@ export function ConfigFormsClient(props: {
                 <input type="hidden" name="tab" value="alerts" />
                 <div className="flex flex-col gap-1 py-1">
                   <Label className="py-1" htmlFor="alertLastClassThreshold">Umbral de última clase</Label>
+                  <p className="text-xs text-muted-foreground py-1">
+                    Reportes avisa cuando a una alumna le quedan estas clases o menos.
+                  </p>
                   <Input className="py-1" id="alertLastClassThreshold" name="alertLastClassThreshold" type="number" min={0} required defaultValue={props.policy.alertLastClassThreshold} />
                 </div>
                 <div className="flex flex-col gap-1 py-1">
@@ -343,31 +288,7 @@ export function ConfigFormsClient(props: {
                 <CardTitle className="text-base font-medium">Avanzado</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6 py-1 pb-6">
-                <DbActionForm action={saveConfigAction} kind="update" className="space-y-4">
-                  <input type="hidden" name="tab" value="advanced" />
-                  <div className="flex flex-col gap-1 py-1">
-                    <Label className="py-1" htmlFor="maintenanceMode">Modo mantenimiento</Label>
-                    <select
-                      id="maintenanceMode"
-                      name="maintenanceMode"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                      defaultValue={props.policy.maintenanceMode ? "true" : "false"}
-                    >
-                      <option value="false">Desactivado</option>
-                      <option value="true">Activado</option>
-                    </select>
-                  </div>
-                  <div className="py-1 pt-4">
-                    <Button
-                      type="submit"
-                      className="px-6 py-1 min-h-[calc(2.25rem+4px)]"
-                    >
-                      Guardar cambios
-                    </Button>
-                  </div>
-                </DbActionForm>
-
-                <div className="flex flex-col gap-1 py-1 pt-6">
+                <div className="flex flex-col gap-1 py-1">
                   <div className="font-medium text-sm py-1">Exportación de datos</div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" asChild>

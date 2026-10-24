@@ -41,11 +41,13 @@ export function getPgDb(): PgDb {
   return cachedPg!
 }
 
+/** La app corre sobre SQLite: desarrollo local, o el build sin base de Postgres. */
+export function usesSqlite(): boolean {
+  return shouldUseSqlite() || shouldUsePgBuildFallback() || !getPgDatabaseUrl()
+}
+
 export function getDb(): AppDb {
-  if (shouldUseSqlite() || shouldUsePgBuildFallback()) {
-    return getSqliteDb()
-  }
-  if (!getPgDatabaseUrl()) {
+  if (usesSqlite()) {
     return getSqliteDb()
   }
   return getPgDb() as unknown as AppDb

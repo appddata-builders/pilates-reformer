@@ -160,7 +160,8 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
       .where(eq(schema.booking.status, "confirmed"))
       .groupBy(schema.booking.userId),
 
-    // Alumnos en alerta: suscripciones activas con classesRemaining <= 2
+    // Suscripciones activas con tope de clases; las de alerta se filtran con el
+    // umbral de Configuración
     db
       .select({
         userId: schema.subscription.userId,
@@ -173,17 +174,15 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
       .where(and(
         eq(schema.subscription.status, "active"),
         eq(schema.subscription.isUnlimited, false),
-        sql`${schema.subscription.classesRemaining} IS NOT NULL AND ${schema.subscription.classesRemaining} <= 2`,
+        sql`${schema.subscription.classesRemaining} IS NOT NULL`,
       ))
       .orderBy(asc(schema.subscription.classesRemaining), asc(schema.subscription.endDate)),
 
-    // Studio policy (reformers, umbral de alerta)
+    // Umbral de alerta de últimas clases
     db
-      .select({
-        totalReformers: schema.studioPolicy.totalReformers,
-        alertThreshold: schema.studioPolicy.alertLastClassThreshold,
-      })
+      .select({ alertThreshold: schema.studioPolicy.alertLastClassThreshold })
       .from(schema.studioPolicy)
+      .where(eq(schema.studioPolicy.id, "main"))
       .limit(1),
 
     // Clases por coach en el periodo
@@ -224,7 +223,8 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
 
   // ── métricas derivadas ───────────────────────────────────────────────────────
 
-  const totalReformers = policy[0]?.totalReformers ?? 8
+  const alertThreshold = policy[0]?.alertThreshold ?? 2
+  const alertSubs = alertSubsRaw.filter((row) => (row.classesRemaining ?? 0) <= alertThreshold)
 
   // Visitas nuevas: usuarios cuya primera booking cae en el periodo
   const visitasNuevas = firstBookingPerUser.filter((r) => {
@@ -345,7 +345,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
   // ── aforo semanal ────────────────────────────────────────────────────────────
 
   const activeSlotCount = slots.length
-  const weeklyCapacity = activeSlotCount * totalReformers
+  const weeklyCapacity = slots.reduce((sum, slot) => sum + slot.capacity, 0)
 
   // Timestamps de bookings para filtrado rápido por semana
   const bookingTimes = bookingsWithUser.map((b) => toTs(b.bookingDate).getTime()).sort((a, b) => a - b)
@@ -538,7 +538,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Capacidad semanal: {activeSlotCount} clases × {totalReformers} reformers = {weeklyCapacity} lugares
+            Capacidad semanal: {activeSlotCount} clases, {weeklyCapacity} lugares
           </p>
         </CardContent>
       </Card>
@@ -729,12 +729,12 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
         </CardContent>
       </Card>
 
-      {alertSubsRaw.length > 0 && (
+      {alertSubs.length > 0 && (
         <Card data-tour="reportes-alertas" className="border-none shadow-sm">
           <CardHeader>
             <CardTitle className="text-base font-medium flex items-center gap-2">
               Alerta: Últimas Clases
-              <Badge variant="destructive">{alertSubsRaw.length}</Badge>
+              <Badge variant="destructive">{alertSubs.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -747,7 +747,7 @@ export default async function ReportesPage({ searchParams }: { searchParams: Sea
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {alertSubsRaw.map((row, i) => {
+                {alertSubs.map((row, i) => {
                   const remaining = row.classesRemaining ?? 0
                   const isRed = remaining <= 1
                   return (

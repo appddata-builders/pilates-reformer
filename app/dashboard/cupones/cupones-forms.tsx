@@ -31,7 +31,8 @@ export type CouponRow = {
   discountType: string
   discountValue: number
   maxUses: number | null
-  usedCount: number
+  /** Usuarios que lo usan con un cobro en pie. */
+  usedBy: number
   validFrom: string
   validUntil: string
   isActive: boolean
@@ -85,7 +86,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
         <div data-tour="page-header">
           <h1 className="text-2xl font-semibold tracking-tight">Cupones</h1>
           <p className="text-sm text-muted-foreground">
-            {props.cupones.length} cupones. Úsalos al asignar un plan para recalcular el precio.
+            {props.cupones.length} cupones. Se aplican al asignar un plan en Usuarios o al solicitarlo en Mis planes.
           </p>
         </div>
         <Dialog
@@ -142,8 +143,9 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="create-maxUses">Usos máximos (opcional)</Label>
+                <Label htmlFor="create-maxUses">Límite de usuarios (opcional)</Label>
                 <Input id="create-maxUses" name="maxUses" type="number" min={1} placeholder="Sin límite" />
+                <p className="text-xs text-muted-foreground">Cada usuario puede usarlo una vez.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -171,7 +173,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
               <TableHead className="text-muted-foreground font-normal text-sm">Código</TableHead>
               <TableHead className="text-muted-foreground font-normal text-sm">Nombre</TableHead>
               <TableHead className="text-muted-foreground font-normal text-sm">Descuento</TableHead>
-              <TableHead className="text-muted-foreground font-normal text-sm">Usos</TableHead>
+              <TableHead className="text-muted-foreground font-normal text-sm">Usuarios</TableHead>
               <TableHead className="text-muted-foreground font-normal text-sm">Vigencia</TableHead>
               <TableHead className="text-muted-foreground font-normal text-sm">Estado</TableHead>
               <TableHead className="text-muted-foreground font-normal text-sm text-right">Acciones</TableHead>
@@ -191,7 +193,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
                   <TableCell>{c.name}</TableCell>
                   <TableCell>{couponDiscountLabel(c.discountType, c.discountValue)}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {c.usedCount}
+                    {c.usedBy}
                     {c.maxUses != null ? ` / ${c.maxUses}` : " / ∞"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
@@ -311,7 +313,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-maxUses">Usos máximos (opcional)</Label>
+                <Label htmlFor="edit-maxUses">Límite de usuarios (opcional)</Label>
                 <Input
                   id="edit-maxUses"
                   name="maxUses"
@@ -320,6 +322,7 @@ export function CuponesFormsClient(props: { cupones: CouponRow[] }) {
                   defaultValue={editCoupon.maxUses ?? undefined}
                   placeholder="Sin límite"
                 />
+                <p className="text-xs text-muted-foreground">Cada usuario puede usarlo una vez.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">

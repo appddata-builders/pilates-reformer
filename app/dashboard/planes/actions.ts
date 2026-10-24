@@ -12,6 +12,7 @@ import {
   findDuplicatePlan,
 } from "@/lib/site/plans"
 import { requestPlan } from "@/lib/plan-requests"
+import { previewCoupon, type CouponPreview } from "@/lib/coupons"
 
 export type ActionState = {
   success: boolean
@@ -319,10 +320,12 @@ export async function requestPlanAction(
     return { success: false, error: "Elige un plan" }
   }
 
+  const couponCode = formData.get("couponCode")
   const result = await requestPlan(getDb(), {
     userId: session.user.id,
     planId: planId.trim(),
     renewal: formData.get("renewal") === "true",
+    couponCode: typeof couponCode === "string" ? couponCode : null,
   })
   if (!result.ok) return { success: false, error: result.error }
 
@@ -332,4 +335,16 @@ export async function requestPlanAction(
   revalidatePath("/dashboard/usuarios")
   revalidatePath("/agendar")
   return { success: true, message: result.message }
+}
+
+/** Precio con cupón antes de solicitar o renovar el plan. */
+export async function previewMyPlanCouponAction(
+  code: string,
+  planId: string,
+): Promise<CouponPreview> {
+  const session = await getSession()
+  if (session == null || session.user.role !== "alumno") {
+    return { ok: false, message: "No autorizado" }
+  }
+  return previewCoupon(getDb(), { code, planId, userId: session.user.id })
 }

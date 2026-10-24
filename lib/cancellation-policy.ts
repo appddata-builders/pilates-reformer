@@ -12,7 +12,6 @@ import {
 
 export type StudioCancellationPolicy = {
   cancelMinutes: number
-  lateCancelPenalty: boolean
   bookingWindowMinutes: number
 }
 
@@ -147,21 +146,14 @@ export async function loadStudioCancellationPolicy(db: AnyDb): Promise<StudioCan
   const [row] = await db
     .select({
       cancelMinutes: schema.studioPolicy.cancelMinutes,
-      cancelHours: schema.studioPolicy.cancelHours,
-      lateCancelPenalty: schema.studioPolicy.lateCancelPenalty,
       bookingWindowMinutes: schema.studioPolicy.bookingWindowMinutes,
     })
     .from(schema.studioPolicy)
     .where(eq(schema.studioPolicy.id, "main"))
     .limit(1)
 
-  const cancelMinutes =
-    row?.cancelMinutes ??
-    (row?.cancelHours != null ? row.cancelHours * 60 : 90)
-
   return {
-    cancelMinutes,
-    lateCancelPenalty: row?.lateCancelPenalty ?? true,
+    cancelMinutes: row?.cancelMinutes ?? 90,
     bookingWindowMinutes: row?.bookingWindowMinutes ?? DEFAULT_BOOKING_WINDOW_MINUTES,
   }
 }

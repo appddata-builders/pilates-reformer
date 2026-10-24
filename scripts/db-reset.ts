@@ -22,10 +22,12 @@ import postgres from "postgres"
 
 const BLOCKED_HOSTS = new Set([
   "159.203.90.92",
+  "159.203.150.145",
 ])
 
 const BLOCKED_DB_NAMES = new Set([
   "pilates",
+  "pilates-reformer",
   "production",
   "prod",
   "main",
@@ -34,7 +36,6 @@ const BLOCKED_DB_NAMES = new Set([
 const PG_TABLES = [
   "notification",
   "studio_event",
-  "studio_kpi_snapshot",
   "coach_payroll_period",
   "sale_item",
   "payment",
@@ -42,7 +43,6 @@ const PG_TABLES = [
   "subscription",
   "schedule_slot_exception",
   "schedule_slot",
-  "reformer",
   "coupon",
   "plan",
   "studio_policy",

@@ -59,14 +59,6 @@ export const plan = sqliteTable("plan", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
 })
 
-export const reformer = sqliteTable("reformer", {
-  id: text("id").primaryKey(),
-  number: integer("number").notNull().unique(),
-  name: text("name"),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  notes: text("notes"),
-})
-
 export const scheduleSlot = sqliteTable("schedule_slot", {
   id: text("id").primaryKey(),
   className: text("class_name").notNull(),
@@ -113,12 +105,17 @@ export const subscription = sqliteTable(
     isUnlimited: integer("is_unlimited", { mode: "boolean" }).notNull().default(false),
     discountPct: real("discount_pct"),
     discountReason: text("discount_reason"),
+    // Cupón con el que se contrató. Sus usos se cuentan desde aquí (lib/coupons.ts).
+    couponId: text("coupon_id").references(() => coupon.id),
     billingCycle: text("billing_cycle").notNull().default("mensual"),
     costPerClass: real("cost_per_class"),
     paidAmount: real("paid_amount"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   },
-  (t) => [index("subscription_userId_idx").on(t.userId)],
+  (t) => [
+    index("subscription_userId_idx").on(t.userId),
+    index("subscription_coupon_id_idx").on(t.couponId),
+  ],
 )
 
 export const booking = sqliteTable(
@@ -141,7 +138,6 @@ export const booking = sqliteTable(
     trialClass: integer("trial_class", { mode: "boolean" }).notNull().default(false),
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     notes: text("notes"),
-    reformerNumber: integer("reformer_number"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   },
   (t) => [
@@ -156,7 +152,9 @@ export const payment = sqliteTable(
     id: text("id").primaryKey(),
     userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     subscriptionId: text("subscription_id").references(() => subscription.id),
-    bookingId: text("booking_id"),
+    // Cobro de una clase suelta. Borrar el horario borra sus reservas; el cobro
+    // se queda en el histórico de caja, sin la reserva.
+    bookingId: text("booking_id").references(() => booking.id, { onDelete: "set null" }),
     amount: real("amount").notNull(),
     currency: text("currency").notNull().default("MXN"),
     method: text("method").notNull().default("efectivo"),
@@ -169,7 +167,10 @@ export const payment = sqliteTable(
     cancelReason: text("cancel_reason"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
   },
-  (t) => [index("payment_userId_idx").on(t.userId)],
+  (t) => [
+    index("payment_userId_idx").on(t.userId),
+    index("payment_booking_id_idx").on(t.bookingId),
+  ],
 )
 
 export const saleItem = sqliteTable("sale_item", {
@@ -199,22 +200,6 @@ export const coachPayrollPeriod = sqliteTable("coach_payroll_period", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
 })
 
-export const studioKpiSnapshot = sqliteTable("studio_kpi_snapshot", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  periodLabel: text("period_label").notNull(),
-  periodStart: integer("period_start", { mode: "timestamp_ms" }).notNull(),
-  periodEnd: integer("period_end", { mode: "timestamp_ms" }).notNull(),
-  totalClasses: integer("total_classes").notNull().default(0),
-  totalAttendances: integer("total_attendances").notNull().default(0),
-  occupancyRate: real("occupancy_rate"),
-  activeMembers: integer("active_members").notNull().default(0),
-  renewals: integer("renewals").notNull().default(0),
-  newEnrollments: integer("new_enrollments").notNull().default(0),
-  cancellations: integer("cancellations").notNull().default(0),
-  targetOccupancy: real("target_occupancy").notNull().default(0.85),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
-})
-
 export const coupon = sqliteTable("coupon", {
   id: text("id").primaryKey(),
   code: text("code").notNull().unique(),
@@ -222,7 +207,6 @@ export const coupon = sqliteTable("coupon", {
   discountType: text("discount_type").notNull().default("percent"),
   discountValue: real("discount_value").notNull(),
   maxUses: integer("max_uses"),
-  usedCount: integer("used_count").notNull().default(0),
   validFrom: integer("valid_from", { mode: "timestamp_ms" }),
   validUntil: integer("valid_until", { mode: "timestamp_ms" }),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
@@ -233,8 +217,6 @@ export const studioPolicy = sqliteTable("studio_policy", {
   id: text("id").primaryKey().default("main"),
   studioName: text("studio_name").notNull().default("Pilates Studio"),
   logoUrl: text("logo_url"),
-  maxCapacity: integer("max_capacity").notNull().default(10),
-  cancelHours: integer("cancel_hours").notNull().default(1),
   cancelMinutes: integer("cancel_minutes").notNull().default(90),
   alertLastClassThreshold: integer("alert_last_class_threshold").notNull().default(2),
   alertDaysBeforeExpiry: integer("alert_days_before_expiry").notNull().default(3),
@@ -244,16 +226,7 @@ export const studioPolicy = sqliteTable("studio_policy", {
   birthdayMessage: text("birthday_message").notNull().default(
     "¡Feliz cumpleaños {{nombre}}! El equipo de {{estudio}} te desea un día increíble.",
   ),
-  lateCancelPenalty: integer("late_cancel_penalty", { mode: "boolean" }).notNull().default(true),
-  noShowPenalty: integer("no_show_penalty", { mode: "boolean" }).notNull().default(true),
-  maxBookingsPerDay: integer("max_bookings_per_day").notNull().default(1),
-  bookingWindowDays: integer("booking_window_days").notNull().default(7),
   bookingWindowMinutes: integer("booking_window_minutes").notNull().default(5),
-  coachRatePerClass: real("coach_rate_per_class").notNull().default(250),
-  totalReformers: integer("total_reformers").notNull().default(8),
-  costPerClassBase: real("cost_per_class_base").notNull().default(270),
-  brandColor: text("brand_color").notNull().default("#1b2d6e"),
-  maintenanceMode: integer("maintenance_mode", { mode: "boolean" }).notNull().default(false),
   navPermissions: text("nav_permissions"),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull()
     .$defaultFn(() => new Date()).$onUpdate(() => new Date()),
@@ -298,10 +271,6 @@ export const planRelations = relations(plan, ({ many }) => ({
   subscriptions: many(subscription),
 }))
 
-export const reformerRelations = relations(reformer, ({ many }) => ({
-  bookings: many(booking),
-}))
-
 export const scheduleSlotRelations = relations(scheduleSlot, ({ many }) => ({
   bookings: many(booking),
   exceptions: many(scheduleSlotException),
@@ -317,17 +286,24 @@ export const scheduleSlotExceptionRelations = relations(scheduleSlotException, (
 export const subscriptionRelations = relations(subscription, ({ one, many }) => ({
   user: one(user, { fields: [subscription.userId], references: [user.id] }),
   plan: one(plan, { fields: [subscription.planId], references: [plan.id] }),
+  coupon: one(coupon, { fields: [subscription.couponId], references: [coupon.id] }),
   payments: many(payment),
 }))
 
-export const bookingRelations = relations(booking, ({ one }) => ({
+export const couponRelations = relations(coupon, ({ many }) => ({
+  subscriptions: many(subscription),
+}))
+
+export const bookingRelations = relations(booking, ({ one, many }) => ({
   user: one(user, { fields: [booking.userId], references: [user.id] }),
   scheduleSlot: one(scheduleSlot, { fields: [booking.scheduleSlotId], references: [scheduleSlot.id] }),
+  payments: many(payment),
 }))
 
 export const paymentRelations = relations(payment, ({ one }) => ({
   user: one(user, { fields: [payment.userId], references: [user.id] }),
   subscription: one(subscription, { fields: [payment.subscriptionId], references: [subscription.id] }),
+  booking: one(booking, { fields: [payment.bookingId], references: [booking.id] }),
 }))
 
 export const saleItemRelations = relations(saleItem, ({ one }) => ({

@@ -10,20 +10,14 @@ import { eq } from "drizzle-orm"
 import { serializeNavPermissions, type NavPermissionsMap } from "@/lib/nav-permissions"
 import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding"
 
-const tabSchema = z.enum(["general", "booking", "alerts", "messages", "advanced"])
+const tabSchema = z.enum(["general", "booking", "alerts", "messages"])
 
 const generalSchema = z.object({
   studioName: z.string().trim().min(1, "Nombre requerido"),
-  brandColor: z.string().trim().min(4, "Color inválido"),
 })
 
 const bookingSchema = z.object({
-  maxCapacity: z.coerce.number().min(1).max(500),
   cancelMinutes: z.coerce.number().min(0).max(10080),
-  lateCancelPenalty: z.enum(["true", "false"]),
-  noShowPenalty: z.enum(["true", "false"]),
-  maxBookingsPerDay: z.coerce.number().min(1).max(50),
-  bookingWindowDays: z.coerce.number().min(1).max(365),
   bookingWindowMinutes: z.coerce.number().min(0).max(1440),
 })
 
@@ -35,10 +29,6 @@ const alertsSchema = z.object({
 const messagesSchema = z.object({
   welcomeMessage: z.string().min(1, "Mensaje de bienvenida requerido"),
   birthdayMessage: z.string().min(1, "Mensaje de cumpleaños requerido"),
-})
-
-const advancedSchema = z.object({
-  maintenanceMode: z.enum(["true", "false"]),
 })
 
 export type ConfigActionResult = {
@@ -78,7 +68,6 @@ async function ensureMainStudioPolicy(db: ReturnType<typeof getDb>) {
   await db.insert(schema.studioPolicy).values({
     id: "main",
     studioName: DEFAULT_STUDIO_NAME,
-    brandColor: "#1b2d6e",
     navPermissions: serializeNavPermissions(getDefaultNavPermissions()),
   })
 }
@@ -128,7 +117,6 @@ export async function saveConfigAction(formData: FormData): Promise<ConfigAction
     if (tabParsed.data === "general") {
       const parsed = generalSchema.safeParse({
         studioName: readFormString(formData, "studioName"),
-        brandColor: readFormString(formData, "brandColor"),
       })
       if (!parsed.success) {
         return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" }
@@ -137,7 +125,6 @@ export async function saveConfigAction(formData: FormData): Promise<ConfigAction
         .update(schema.studioPolicy)
         .set({
           studioName: parsed.data.studioName,
-          brandColor: parsed.data.brandColor,
           updatedAt: new Date(),
         })
         .where(eq(schema.studioPolicy.id, "main"))
@@ -147,12 +134,7 @@ export async function saveConfigAction(formData: FormData): Promise<ConfigAction
 
     if (tabParsed.data === "booking") {
       const parsed = bookingSchema.safeParse({
-        maxCapacity: formData.get("maxCapacity"),
         cancelMinutes: formData.get("cancelMinutes"),
-        lateCancelPenalty: formData.get("lateCancelPenalty"),
-        noShowPenalty: formData.get("noShowPenalty"),
-        maxBookingsPerDay: formData.get("maxBookingsPerDay"),
-        bookingWindowDays: formData.get("bookingWindowDays"),
         bookingWindowMinutes: formData.get("bookingWindowMinutes"),
       })
       if (!parsed.success) {
@@ -161,13 +143,7 @@ export async function saveConfigAction(formData: FormData): Promise<ConfigAction
       await db
         .update(schema.studioPolicy)
         .set({
-          maxCapacity: parsed.data.maxCapacity,
           cancelMinutes: parsed.data.cancelMinutes,
-          cancelHours: Math.max(1, Math.ceil(parsed.data.cancelMinutes / 60)),
-          lateCancelPenalty: parsed.data.lateCancelPenalty === "true",
-          noShowPenalty: parsed.data.noShowPenalty === "true",
-          maxBookingsPerDay: parsed.data.maxBookingsPerDay,
-          bookingWindowDays: parsed.data.bookingWindowDays,
           bookingWindowMinutes: parsed.data.bookingWindowMinutes,
           updatedAt: new Date(),
         })
@@ -209,27 +185,6 @@ export async function saveConfigAction(formData: FormData): Promise<ConfigAction
         .set({
           welcomeMessage: parsed.data.welcomeMessage,
           birthdayMessage: parsed.data.birthdayMessage,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.studioPolicy.id, "main"))
-      revalidatePath("/dashboard/configuracion")
-      return { success: true }
-    }
-
-    if (tabParsed.data === "advanced") {
-      if (session.user.role !== "root") {
-        return { success: false, error: "No autorizado" }
-      }
-      const parsed = advancedSchema.safeParse({
-        maintenanceMode: formData.get("maintenanceMode"),
-      })
-      if (!parsed.success) {
-        return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" }
-      }
-      await db
-        .update(schema.studioPolicy)
-        .set({
-          maintenanceMode: parsed.data.maintenanceMode === "true",
           updatedAt: new Date(),
         })
         .where(eq(schema.studioPolicy.id, "main"))

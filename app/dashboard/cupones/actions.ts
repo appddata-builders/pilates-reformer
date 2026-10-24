@@ -8,6 +8,7 @@ import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { normalizeCouponCode } from "@/lib/coupon-pricing"
+import { studioLocalDateTimeToInstant } from "@/lib/studio-month"
 
 export type ActionState = {
   success: boolean
@@ -22,13 +23,12 @@ async function assertStaff() {
   return { session, ok }
 }
 
+// Mediodía del estudio: el día se lee igual en cualquier zona horaria del servidor.
 function parseOptionalDate(raw: FormDataEntryValue | null): Date | null {
   if (raw == null) return null
   const value = String(raw).trim()
-  if (value === "") return null
-  const d = new Date(`${value}T12:00:00`)
-  if (Number.isNaN(d.getTime())) return null
-  return d
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  return studioLocalDateTimeToInstant(value, 12, 0)
 }
 
 const couponSchema = z
@@ -50,6 +50,13 @@ const couponSchema = z
         code: z.ZodIssueCode.custom,
         message: "El porcentaje no puede ser mayor a 100",
         path: ["discountValue"],
+      })
+    }
+    if (data.validFrom && data.validUntil && data.validFrom > data.validUntil) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "La fecha final no puede ser anterior a la inicial",
+        path: ["validUntil"],
       })
     }
   })
@@ -94,7 +101,6 @@ export async function createCouponAction(
     discountType: parsed.data.discountType,
     discountValue: parsed.data.discountValue,
     maxUses: parsed.data.maxUses,
-    usedCount: 0,
     validFrom: parseOptionalDate(parsed.data.validFrom ?? null),
     validUntil: parseOptionalDate(parsed.data.validUntil ?? null),
     isActive: true,

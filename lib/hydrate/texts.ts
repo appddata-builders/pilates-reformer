@@ -1,10 +1,10 @@
 import "server-only"
 
 import { eq } from "drizzle-orm"
-import { getDb } from "@/lib/db"
-import { hydrate } from "@/lib/db/schema"
-import { hydrate as hydratePg } from "@/lib/db/schema.pg"
+import { getSqliteDb, usesSqlite } from "@/lib/db"
+import { hydrate as hydrateSqlite } from "@/lib/db/schema.sqlite"
 import { getHydrateDb } from "./db"
+import { hydrate } from "./schema"
 import fallbackContent from "./fallback.pilates-reformer.json"
 import type { TextResources } from "./types"
 
@@ -46,11 +46,14 @@ export async function getHydratedResources(): Promise<TextResources> {
   try {
     // `hydrate` vive en la base de appddata, no en la propia. Con
     // APPSTRACT_DATABASE_URL se lee de alla; sin ella -desarrollo local- se
-    // sigue leyendo el SQLite de la app, que si trae la tabla.
+    // sigue leyendo el SQLite de la app, que si trae la tabla. La base Postgres
+    // propia no la tiene: ahi, sin esa variable, queda el fallback.
     const hydrateDb = getHydrateDb()
-    databaseRows = hydrateDb
-      ? await hydrateDb.select({ contentKey: hydratePg.contentKey, contentValue: hydratePg.contentValue }).from(hydratePg).where(eq(hydratePg.projectSlug, PROJECT_SLUG))
-      : await getDb().select({ contentKey: hydrate.contentKey, contentValue: hydrate.contentValue }).from(hydrate).where(eq(hydrate.projectSlug, PROJECT_SLUG))
+    if (hydrateDb) {
+      databaseRows = await hydrateDb.select({ contentKey: hydrate.contentKey, contentValue: hydrate.contentValue }).from(hydrate).where(eq(hydrate.projectSlug, PROJECT_SLUG))
+    } else if (usesSqlite()) {
+      databaseRows = await getSqliteDb().select({ contentKey: hydrateSqlite.contentKey, contentValue: hydrateSqlite.contentValue }).from(hydrateSqlite).where(eq(hydrateSqlite.projectSlug, PROJECT_SLUG))
+    }
   } catch (error) {
     console.info("Textos de hydrate no disponibles; se usará el fallback local.", error)
   }

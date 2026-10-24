@@ -1,12 +1,13 @@
 import { and, asc, eq, gt, inArray, isNotNull, ne, sql } from "drizzle-orm"
 import type { AnyDb } from "@/lib/db"
-import { withAsyncTransaction } from "@/lib/db/async-transaction"
+import { withResultTransaction } from "@/lib/db/async-transaction"
 import * as schema from "@/lib/db/schema"
 import {
   activateSubscriptionForUser,
   closeExpiredSubscriptionsCarryingClasses,
 } from "@/lib/activate-subscription"
 import { INDIVIDUAL_CLASS_PLAN_ID } from "@/lib/class-charge"
+import { normalizeCouponCode } from "@/lib/coupon-pricing"
 import { createNotification } from "@/lib/notifications"
 import { subscriptionEndOfDay } from "@/lib/subscription-dates"
 import { isSubscriptionCurrent, pickPrimarySubscription } from "@/lib/subscription-display"
@@ -175,16 +176,17 @@ async function notifyStaff(db: AnyDb, title: string, body: string): Promise<void
   }
 }
 
-type PlanRequestParams = { userId: string; planId: string; renewal?: boolean }
+type PlanRequestParams = { userId: string; planId: string; renewal?: boolean; couponCode?: string | null }
 
 /**
  * Solicitar un plan, o renovar el que terminó (`renewal`). Va en una
  * transacción que bloquea a la alumna: un doble clic, dos pestañas o un
  * reintento de red leían "sin plan" al mismo tiempo y abrían dos planes con dos
- * cobros. Ahora la segunda espera a la primera y ya ve el plan vigente.
+ * cobros. Ahora la segunda espera a la primera y ya ve el plan vigente. Si el
+ * plan no se abre -un cupón que ya no aplica- el periodo vencido no se cierra.
  */
 export async function requestPlan(db: AnyDb, params: PlanRequestParams): Promise<PlanRequestResult> {
-  return withAsyncTransaction(db, async (tx) => {
+  return withResultTransaction(db, async (tx) => {
     await tx.update(schema.user)
       .set({ updatedAt: sql`${schema.user.updatedAt}` })
       .where(eq(schema.user.id, params.userId))
@@ -217,12 +219,15 @@ async function requestPlanLocked(db: AnyDb, params: PlanRequestParams): Promise<
       ? await closeExpiredSubscriptionsCarryingClasses(db, params.userId)
       : 0
 
+  const couponCode = params.couponCode?.trim() || null
   const activated = await activateSubscriptionForUser(db, {
     userId: params.userId,
     planId: plan.id,
     carriedClasses,
+    couponCode,
   })
   if (!activated.ok) return { ok: false, error: activated.error }
+  const couponNote = couponCode != null ? ` con el cupón ${normalizeCouponCode(couponCode)}` : ""
 
   const created = await loadPrimarySubscription(db, params.userId)
   const endLabel = created != null ? formatDay(toDate(created.endDate)) : ""
@@ -237,17 +242,17 @@ async function requestPlanLocked(db: AnyDb, params: PlanRequestParams): Promise<
     userId: params.userId,
     type: "plan_requested",
     title: isRenewal ? "Renovaste tu plan" : "Tu plan quedó activo",
-    body: `Hola ${name}, ${plan.name} está activo hasta el ${endLabel}. Ya puedes reservar.${carriedNote} Quedó pendiente el pago de ${formatMxn(plan.priceMxn)}: págalo en el estudio y ahí lo registran.`,
+    body: `Hola ${name}, ${plan.name} está activo hasta el ${endLabel}. Ya puedes reservar.${carriedNote} Quedó pendiente el pago de ${formatMxn(activated.amount)}${couponNote}: págalo en el estudio y ahí lo registran.`,
   })
   await notifyStaff(
     db,
     `${name} ${isRenewal ? "renovó" : "solicitó"} ${plan.name}`,
-    `Quedó activo a cuenta hasta el ${endLabel}, con ${formatMxn(plan.priceMxn)} pendiente. Confírmalo en Pagos cuando lo recibas.`,
+    `Quedó activo a cuenta hasta el ${endLabel}, con ${formatMxn(activated.amount)} pendiente${couponNote}. Confírmalo en Pagos cuando lo recibas.`,
   )
 
   return {
     ok: true,
-    message: `${plan.name} quedó activo hasta el ${endLabel}.${carriedNote} Paga ${formatMxn(plan.priceMxn)} en el estudio.`,
+    message: `${plan.name} quedó activo hasta el ${endLabel}.${carriedNote} Paga ${formatMxn(activated.amount)}${couponNote} en el estudio.`,
   }
 }
 

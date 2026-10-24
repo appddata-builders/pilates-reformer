@@ -22,14 +22,7 @@ export default async function ConfiguracionPage() {
   const values = {
     studioName: policy?.studioName ?? "Pilates Studio",
     logoUrl: policy?.logoUrl ?? null,
-    brandColor: policy?.brandColor ?? "#1b2d6e",
-    maxCapacity: policy?.maxCapacity ?? 10,
-    cancelHours: policy?.cancelHours ?? 1,
-    cancelMinutes: policy?.cancelMinutes ?? (policy?.cancelHours != null ? policy.cancelHours * 60 : 90),
-    lateCancelPenalty: policy?.lateCancelPenalty ?? true,
-    noShowPenalty: policy?.noShowPenalty ?? true,
-    maxBookingsPerDay: policy?.maxBookingsPerDay ?? 1,
-    bookingWindowDays: policy?.bookingWindowDays ?? 7,
+    cancelMinutes: policy?.cancelMinutes ?? 90,
     bookingWindowMinutes: policy?.bookingWindowMinutes ?? 5,
     alertLastClassThreshold: policy?.alertLastClassThreshold ?? 2,
     alertDaysBeforeExpiry: policy?.alertDaysBeforeExpiry ?? 3,
@@ -39,7 +32,6 @@ export default async function ConfiguracionPage() {
     birthdayMessage:
       policy?.birthdayMessage ??
       "¡Feliz cumpleaños {{nombre}}! El equipo de {{estudio}} te desea un día increíble.",
-    maintenanceMode: policy?.maintenanceMode ?? false,
   }
 
   const navPermissions = parseNavPermissionsJson(policy?.navPermissions ?? null)

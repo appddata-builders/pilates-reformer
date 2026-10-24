@@ -20,8 +20,6 @@ async function main() {
       for (const value of Object.values(schema)) {
         if (!is(value, PgTable)) continue
         const table = getTableConfig(value)
-        // Textos externos o fallback JSON: esta tabla no es requisito de la BD de la app.
-        if (table.name === "hydrate") continue
         for (const column of table.columns) {
           if (!available.has(`${table.name}.${column.name}`)) missing.push(`${table.name}.${column.name}`)
         }

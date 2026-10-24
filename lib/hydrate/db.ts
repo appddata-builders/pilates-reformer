@@ -1,6 +1,6 @@
 import "server-only"
 
-import * as schemaPg from "@/lib/db/schema.pg"
+import * as hydrateSchema from "./schema"
 
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js"
 
@@ -20,7 +20,7 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js"
  * desarrollo local.
  */
 
-export type HydrateDb = PostgresJsDatabase<typeof schemaPg>
+export type HydrateDb = PostgresJsDatabase<typeof hydrateSchema>
 
 // Sin esto, cada request reintenta la conexion cuando la base no responde.
 const RETRY_INTERVAL_MS = 30_000
@@ -57,7 +57,7 @@ export function getHydrateDb(): HydrateDb | null {
 
     // max bajo: aqui solo se leen textos, no hace falta un pool grande.
     const client = postgres(getHydrateDatabaseUrl()!, { max: 3, connect_timeout: 10 })
-    cached = drizzle(client, { schema: schemaPg })
+    cached = drizzle(client, { schema: hydrateSchema })
     return cached
   } catch (error) {
     console.info("Base de hidratacion no disponible; se usara el fallback local.", error)

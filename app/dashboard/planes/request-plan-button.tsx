@@ -11,7 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/shared/ui/alert-dialog"
-import { requestPlanAction, type PlanRequestActionState } from "./actions"
+import { CouponField } from "@/components/features/admin/coupon-field"
+import { previewMyPlanCouponAction, requestPlanAction, type PlanRequestActionState } from "./actions"
 
 const initial: PlanRequestActionState = { success: false }
 
@@ -70,6 +71,13 @@ export function RequestPlanButton(props: {
           <form action={formAction}>
             <input type="hidden" name="planId" value={props.planId} />
             <input type="hidden" name="renewal" value={props.renewal ? "true" : "false"} />
+            <div className="pb-4">
+              <CouponField
+                id={`coupon-${props.planId}`}
+                planId={props.planId}
+                preview={previewMyPlanCouponAction}
+              />
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel type="button" disabled={pending}>
                 Cancelar

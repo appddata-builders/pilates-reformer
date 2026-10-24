@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic"
 import { desc } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
+import { countCouponUsers } from "@/lib/coupons"
+import { studioDateStrFromInstant } from "@/lib/studio-month"
 import { CuponesFormsClient, type CouponRow } from "./cupones-forms"
 
 function toDateOrNull(value: Date | number | null | undefined): Date | null {
@@ -13,18 +15,15 @@ function toDateOrNull(value: Date | number | null | undefined): Date | null {
 
 function toDateInputValue(value: Date | null): string {
   if (value == null) return ""
-  const y = value.getFullYear()
-  const m = String(value.getMonth() + 1).padStart(2, "0")
-  const d = String(value.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
+  return studioDateStrFromInstant(value)
 }
 
 export default async function CuponesPage() {
   const db = getDb()
-  const rows = await db
-    .select()
-    .from(schema.coupon)
-    .orderBy(desc(schema.coupon.createdAt))
+  const [rows, usersByCoupon] = await Promise.all([
+    db.select().from(schema.coupon).orderBy(desc(schema.coupon.createdAt)),
+    countCouponUsers(db),
+  ])
 
   const cupones: CouponRow[] = rows.map((c) => {
     const validFrom = toDateOrNull(c.validFrom as Date | number | null)
@@ -36,7 +35,7 @@ export default async function CuponesPage() {
       discountType: c.discountType,
       discountValue: c.discountValue,
       maxUses: c.maxUses,
-      usedCount: c.usedCount,
+      usedBy: usersByCoupon.get(c.id) ?? 0,
       validFrom: toDateInputValue(validFrom),
       validUntil: toDateInputValue(validUntil),
       isActive: c.isActive,

@@ -26,6 +26,32 @@ export async function withAsyncTransaction<T>(db: AnyDb, work: (tx: AnyDb) => Pr
   }
 }
 
+class FailedResult extends Error {
+  constructor(readonly result: unknown) {
+    super("transaction result was not ok")
+  }
+}
+
+/**
+ * Like withAsyncTransaction, but a `{ ok: false }` result also rolls back, so
+ * a failure halfway through leaves no partial writes behind.
+ */
+export async function withResultTransaction<T extends { ok: boolean }>(
+  db: AnyDb,
+  work: (tx: AnyDb) => Promise<T>,
+): Promise<T> {
+  try {
+    return await withAsyncTransaction(db, async (tx) => {
+      const result = await work(tx)
+      if (!result.ok) throw new FailedResult(result)
+      return result
+    })
+  } catch (error) {
+    if (error instanceof FailedResult) return error.result as T
+    throw error
+  }
+}
+
 async function sqliteTransaction<T>(db: AnyDb, client: Database.Database, work: (tx: AnyDb) => Promise<T>): Promise<T> {
   const { default: SqliteDatabase } = await import("better-sqlite3")
   const { drizzle } = await import("drizzle-orm/better-sqlite3")

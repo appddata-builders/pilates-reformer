@@ -237,6 +237,7 @@ export function AlumnoRowActions(props: { alumno: AlumnoRowData; planes: PlanOpt
               defaultPlanId={props.alumno.planId}
               defaultBillingCycle={props.alumno.billingCycle}
               showStartDate
+              userId={props.alumno.id}
             />
             <div className="space-y-2">
               <Label htmlFor={`edit-role-${props.alumno.id}`}>Rol</Label>
