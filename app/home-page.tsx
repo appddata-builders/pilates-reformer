@@ -40,7 +40,7 @@ export function HomePage(props: {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
-  // Arranca en pausa: el video se pide hasta que la página terminó de cargar.
+
   const [heroVideoPlaying, setHeroVideoPlaying] = useState(false);
 
   const planCards = props.plans.filter((plan) => plan.layout === "card");
@@ -94,12 +94,9 @@ export function HomePage(props: {
       className="relative min-h-screen overflow-clip bg-[#f9f0e3] text-[#1b1a18]"
     >
       <div className="pointer-events-none absolute -left-20 top-40 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(47,107,95,0.25),transparent_70%)] blur-3xl" />
-      {/* Sin animación: queda detrás del video y animarla con blur costaba un repintado por cuadro. */}
       <div className="pointer-events-none absolute right-[-120px] top-[-60px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(47,79,79,0.35),transparent_70%)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-120px] left-1/3 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(255,215,186,0.5),transparent_70%)] blur-3xl" />
 
-      {/* Sin backdrop-blur: con bg-white/95 casi no se notaba y sobre el video
-          obligaba a desenfocar de nuevo en cada cuadro. */}
       <nav
         className="animate-fade-down fixed inset-x-0 top-0 z-50 w-full border pl-3 pr-4 py-2 transition border-black/10 bg-white/95 text-[#1b1a18] shadow-[0_12px_30px_rgba(27,26,24,0.12)]"
       >
