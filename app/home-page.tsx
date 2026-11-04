@@ -93,10 +93,6 @@ export function HomePage(props: {
       id="top"
       className="relative min-h-screen overflow-clip bg-[#f9f0e3] text-[#1b1a18]"
     >
-      <div className="pointer-events-none absolute -left-20 top-40 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(47,107,95,0.25),transparent_70%)] blur-3xl" />
-      <div className="pointer-events-none absolute right-[-120px] top-[-60px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(47,79,79,0.35),transparent_70%)] blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-120px] left-1/3 h-[320px] w-[320px] rounded-full bg-[radial-gradient(circle,rgba(255,215,186,0.5),transparent_70%)] blur-3xl" />
-
       <nav
         className="animate-fade-down fixed inset-x-0 top-0 z-50 w-full border pl-3 pr-4 py-2 transition border-black/10 bg-white/95 text-[#1b1a18] shadow-[0_12px_30px_rgba(27,26,24,0.12)]"
       >
@@ -271,9 +267,11 @@ export function HomePage(props: {
             </div>
           </div>
 
+          {/* El desenfoque sólo en escritorio: encima del video se recalcula en
+              cada cuadro, y en el celular era lo que más trababa el scroll. */}
           <div
             id="weekly"
-            className="animate-fade-up relative flex min-h-105 scroll-mt-40 flex-col gap-4 rounded-card border border-white/15 bg-white/10 p-5 text-white shadow-[0_25px_60px_rgba(27,26,24,0.18)] backdrop-blur sm:p-6 lg:min-h-[480px]"
+            className="animate-fade-up relative flex min-h-105 scroll-mt-40 flex-col gap-4 rounded-card border border-white/15 bg-white/10 p-5 text-white shadow-[0_25px_60px_rgba(27,26,24,0.18)] sm:p-6 lg:min-h-[480px] lg:backdrop-blur"
             style={{ animationDelay: "100ms" }}
           >
             <SetupWeeklySchedule onSelectClass={goToAgendar} initialBoard={props.initialBoard} />
@@ -320,9 +318,9 @@ export function HomePage(props: {
                         className="reveal grid grid-cols-1 gap-3 overflow-hidden lg:rounded-card border border-black/10 bg-white/90 shadow-[0_20px_40px_rgba(27,26,24,0.08)] lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:min-h-[28rem]"
                       >
                         <div className="relative aspect-5/4 w-full overflow-hidden bg-[#d8cfc2] lg:aspect-auto lg:h-full lg:self-stretch">
-                          {/* next/image en vez de background-image: AVIF/WebP al
-                              tamaño real y carga diferida. Los originales pesan
-                              entre 1.8 y 2.8 MB cada uno. */}
+                          {/* next/image en vez de background-image: carga
+                              diferida. La foto es la copia a 1600 px (ver
+                              planCardImage), no el original de S3. */}
                           <Image
                             src={image}
                             alt=""
@@ -456,7 +454,7 @@ export function HomePage(props: {
               className="reveal relative h-80 overflow-hidden rounded-card border border-black/10 bg-[#d8cfc2] shadow-[0_25px_50px_rgba(27,26,24,0.15)] md:h-112 lg:order-last"
             >
               <Image
-                src={`${process.env.NEXT_PUBLIC_S3}material.jpg`}
+                src="/assets/home/material.jpg"
                 alt={t("home.page.text031")}
                 fill
                 sizes="(min-width: 1024px) 45vw, 100vw"
@@ -616,7 +614,7 @@ export function HomePage(props: {
           </div>
           <div className="flex flex-col">
             <div
-              className="mt-4 rounded-card border border-white/10 bg-white/10 p-4 text-sm text-white/70 shadow-[0_20px_40px_rgba(27,26,24,0.1)] backdrop-blur"
+              className="mt-4 rounded-card border border-white/10 bg-white/10 p-4 text-sm text-white/70 shadow-[0_20px_40px_rgba(27,26,24,0.1)]"
             >
               <p className="text-amber-100">{t("home.page.text060")}</p>
               <p>{t("home.page.text061")}</p>

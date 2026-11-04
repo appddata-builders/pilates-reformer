@@ -148,9 +148,14 @@ export const PLAN_DISPLAY_ORDER = STUDIO_PLAN_DEFINITIONS.map((p) => p.id)
 
 export const SINGLE_CLASS_LABEL = "Clase individual"
 
+// Copias a 1600 px (JPEG calidad 80) de las fotos de S3, servidas desde
+// public/assets/home. Como next.config va con `unoptimized`, el navegador
+// recibía los originales (hasta 4592x3448, 2-5 MB cada uno): en el celular
+// decodificarlos trababa el scroll y Safari soltaba las fotos de memoria, que
+// se quedaban en blanco. 1600 px cubre el hueco más grande a 2x-3x.
 const PLAN_CARD_IMAGES = [
-  `${process.env.NEXT_PUBLIC_S3}pilates_6.jpg`,
-  `${process.env.NEXT_PUBLIC_S3}pilates_1.jpg`,
+  "/assets/home/pilates_6.jpg",
+  "/assets/home/pilates_1.jpg",
 ]
 
 /** Foto de la tarjeta de plan, alternada; la comparten la landing y el panel. */

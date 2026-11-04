@@ -229,9 +229,12 @@
  * Aparición al hacer scroll sin JavaScript: la animación avanza con el scroll
  * (animation-timeline: view()) y corre fuera del hilo principal. Donde el
  * navegador no la soporta el contenido simplemente se ve, nunca queda oculto.
+ * Sólo en escritorio: en el celular las fotos se desvanecían y se movían
+ * mientras se hacía scroll, y con el desplazamiento por inercia se sentía
+ * trabado.
  */
 @supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
+  @media (prefers-reduced-motion: no-preference) and (min-width: 1024px) {
     .reveal {
       animation: reveal linear both;
       animation-timeline: view();

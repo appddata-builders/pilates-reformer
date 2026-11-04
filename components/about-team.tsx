@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useTranslation } from "@/lib/text/text-provider";
 
-const TEAM_IMAGE = `${process.env.NEXT_PUBLIC_S3}pilates_5.jpg`;
+// Copia a 1600 px del original de S3 (3990x3448), igual que el resto de las
+// fotos de la landing: ver PLAN_CARD_IMAGES en lib/site/plans.ts.
+const TEAM_IMAGE = "/assets/home/pilates_5.jpg";
 
 export default function AboutTeam() {
   const { t } = useTranslation();

@@ -4,7 +4,9 @@ import Image from "next/image";
 import { FaHeart } from "react-icons/fa6";
 import { useTranslation } from "@/lib/text/text-provider";
 
-const HORARIOS_BG = `${process.env.NEXT_PUBLIC_S3}pilates_7.jpg`;
+// Copia a 1600 px del original de S3 (4592x3448, 5 MB): ver PLAN_CARD_IMAGES
+// en lib/site/plans.ts.
+const HORARIOS_BG = "/assets/home/pilates_7.jpg";
 
 export default function ContentDetail() {
   const { t } = useTranslation();
@@ -18,8 +20,7 @@ export default function ContentDetail() {
         <div
           className="reveal relative overflow-hidden rounded-card h-90 md:h-120 border border-black/10 bg-[#d8cfc2] shadow-[0_25px_50px_rgba(27,26,24,0.15)]"
         >
-          {/* next/image en vez de background-image: sirve AVIF/WebP al tamaño
-              real del hueco y carga en diferido. El original pesa 5 MB. */}
+          {/* next/image en vez de background-image: carga en diferido. */}
           <Image
             src={HORARIOS_BG}
             alt=""
