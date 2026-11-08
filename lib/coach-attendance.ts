@@ -252,8 +252,7 @@ export async function recordWalkInAttendance(db: AnyDb, params: {
       const existing = await findBookingForSlotOnDate(tx, params.userId, slot.id, bookingDate)
       let bookingId = existing?.id
       if (bookingId == null) {
-        // Se revisa antes de insertar, igual que al reservar: la reserva nueva no
-        // debe contar contra su propio tope semanal.
+        // Se revisa antes de insertar, igual que al reservar.
         const coverage = await checkBookableSubscriptionForUser(tx, params.userId, bookingDate)
         const item = params.catalogId
           ? (await getAttendanceCatalog(tx)).find((p) => p.id === params.catalogId)

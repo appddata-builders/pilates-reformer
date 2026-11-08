@@ -29,22 +29,27 @@ function fixture(weeklyLimit: number, unlimited = false) {
 }
 
 for (const limit of [3, 5]) {
-  test(`Una tomada permite las restantes del plan de ${limit} por semana`, async () => {
+  test(`Las ${limit} por semana son sugerencia: pasarse sólo avisa`, async () => {
     const { raw, db, day, add } = fixture(limit)
     try {
       add("taken", true)
       assert.equal(await findBookingOnDate(db, "u", day), null)
       for (let used = 1; used < limit; used++) {
-        assert.equal((await checkBookableSubscriptionForUser(db, "u", day)).ok, true)
+        const below = await checkBookableSubscriptionForUser(db, "u", day)
+        assert.equal(below.ok, true)
+        if (below.ok) assert.equal(below.overWeeklySuggestion, undefined)
         add(`reserved-${used}`, false)
       }
+      // Ya va en lo sugerido: se puede reservar igual, con el aviso.
       const result = await checkBookableSubscriptionForUser(db, "u", day)
-      assert.equal(result.ok, false)
-      if (!result.ok) assert.equal(result.reason, "weekly_limit")
+      assert.equal(result.ok, true)
+      if (result.ok) assert.deepEqual(result.overWeeklySuggestion, { limit, usedThisWeek: limit })
       assert.equal((await findBookingOnDate(db, "u", day))?.id, "reserved-1")
       const nextWeek = new Date(day)
       nextWeek.setDate(day.getDate() + 7)
-      assert.equal((await checkBookableSubscriptionForUser(db, "u", nextWeek)).ok, true)
+      const fresh = await checkBookableSubscriptionForUser(db, "u", nextWeek)
+      assert.equal(fresh.ok, true)
+      if (fresh.ok) assert.equal(fresh.overWeeklySuggestion, undefined)
     } finally { raw.close() }
   })
 }

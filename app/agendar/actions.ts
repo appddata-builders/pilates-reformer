@@ -40,6 +40,7 @@ import {
 import { isSlotDisabledOnDate, listDisabledSlotDateKeys } from "@/lib/slot-exceptions"
 import {
   loadActivePlanSummary,
+  loadPlanProgress,
   loadSuggestedPlans,
   type ActivePlanSummary,
   type SuggestedPlan,
@@ -264,8 +265,12 @@ export type MyBookingContext = {
   plan: {
     name: string
     classesRemaining: number | null
+    /** Clases del plan ya usadas: el "3" de "3 de 12". */
+    classesUsed: number
+    /** Clases del periodo: el "12" de "3 de 12". `null` en el ilimitado. */
+    classesTotal: number | null
     isUnlimited: boolean
-    /** Tope de clases por semana del plan; null si no lo tiene. */
+    /** Clases sugeridas por semana; no es un tope. `null` si el plan no sugiere. */
     weeklyLimit: number | null
     expired: boolean
   } | null
@@ -370,6 +375,7 @@ export async function loadMyBookingContextAction(): Promise<MyBookingContext> {
       )
 
     const primary = pickPrimarySubscription(subs)
+    const progress = primary == null ? undefined : await loadPlanProgress(db, primary.id)
     const plan =
       primary == null
         ? null
@@ -377,6 +383,8 @@ export async function loadMyBookingContextAction(): Promise<MyBookingContext> {
             name: primary.planName,
             classesRemaining:
               primary.isUnlimited === true ? null : (primary.classesRemaining ?? 0),
+            classesUsed: progress?.used ?? 0,
+            classesTotal: progress?.total ?? null,
             isUnlimited: primary.isUnlimited === true,
             weeklyLimit: planWeeklyLimit({
               planType: primary.planType,
@@ -464,7 +472,6 @@ export async function createPublicBookingAction(
     scheduleSlotId: parsed.data.scheduleSlotId,
     bookingDate,
     birthdate: alumna.birthdate,
-    enforceWeeklyLimit: !acceptIndividualClass,
   })
 
   if (!result.ok) {
@@ -610,7 +617,7 @@ export type BookingEligibility = {
   message?: string
   alumnaName?: string
   /** Sin plan que la cubra: la clase se reserva igual y queda como adeudo. */
-  willBeCharged?: { priceMxn: number; planName: string; weeklyLimitReached?: boolean }
+  willBeCharged?: { priceMxn: number; planName: string }
   /** La cuenta aún no redime su clase muestra gratuita. */
   trialAvailable?: boolean
   /** Plan que va a cubrir la clase, para mostrar vigencia y clases restantes. */
@@ -621,6 +628,8 @@ export type BookingEligibility = {
   planBlockedMessage?: string
   /** Aviso del plan: clases de un periodo vencido que hay que cuadrar. */
   planWarning?: string
+  /** La semana ya va en las clases sugeridas del plan; se reserva igual. */
+  overWeeklySuggestion?: { limit: number; usedThisWeek: number }
   /** Clase que ya tiene ese día; elegir otra hora la mueve en vez de duplicarla. */
   sameDayBooking?: { startTime: string; className: string }
   /** La celda elegida es su propia reserva: liberarla, moverla o darla por tomada. */
@@ -728,24 +737,9 @@ export async function checkPublicBookingEligibility(
     return { ok: true, alumnaName: alumna.name, sameDayBooking }
   }
 
+  // Las clases por semana del plan son sugerencia: pasarse no cobra la clase,
+  // se descuenta del plan y el modal sólo lo avisa.
   const subCheck = await checkBookableSubscriptionForUser(db, alumna.id, bookingDate)
-  if (!subCheck.ok && subCheck.reason === "weekly_limit") {
-    const individualPlan = await getIndividualClassPlan(db)
-    if (individualPlan == null) {
-      return { ok: false, message: "Alcanzaste el límite semanal de tu plan. Contacta al estudio para comprar una clase individual." }
-    }
-    return {
-      ok: true,
-      alumnaName: alumna.name,
-      willBeCharged: {
-        priceMxn: individualPlan.priceMxn,
-        planName: individualPlan.name,
-        weeklyLimitReached: true,
-      },
-      trialAvailable: false,
-    }
-  }
-
   if (!subCheck.ok) {
     const [plan, trialUsed, suggestedPlans, requestState] = await Promise.all([
       getIndividualClassPlan(db),
@@ -773,6 +767,7 @@ export async function checkPublicBookingEligibility(
     alumnaName: alumna.name,
     activePlan: await loadActivePlanSummary(db, subCheck.subscriptionId),
     planWarning: subCheck.warning,
+    overWeeklySuggestion: subCheck.overWeeklySuggestion,
     sameDayBooking,
   }
 }

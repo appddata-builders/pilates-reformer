@@ -42,9 +42,18 @@ test("PostgreSQL: extra individual, cancelación y clase tomada", { skip: !enabl
     for (let i = 0; i < 3; i++) await sql`INSERT INTO booking
       (id, user_id, schedule_slot_id, booking_date) VALUES (${prefix + '-' + i}, ${userId}, ${otherSlot}, ${bookingDate.toISOString()})`
     const params = { userId, scheduleSlotId: slotId, bookingDate }
-    const blocked = await createBookingForUser(db, { ...params, enforceWeeklyLimit: true })
-    assert.equal(blocked.ok, false)
-    const extra = await createBookingForUser(db, { ...params, enforceWeeklyLimit: false })
+    // Las 3 por semana son sugerencia: la cuarta se descuenta del plan.
+    const overSuggestion = await createBookingForUser(db, params)
+    if (!overSuggestion.ok) throw new Error(overSuggestion.message)
+    assert.equal(overSuggestion.coveredByPlan, true)
+    const [afterPlan] = await sql`SELECT classes_remaining FROM subscription WHERE id = ${subId}`
+    assert.equal(afterPlan.classes_remaining, 8)
+    const released = await cancelBookingById(db, overSuggestion.bookingId, { bypassPolicy: true })
+    assert.equal(released.ok, true)
+    if (released.ok) assert.equal(released.restoredClass, true)
+    // Sin clases en el plan, la reserva queda fuera de él: es una individual.
+    await sql`UPDATE subscription SET classes_remaining = 0 WHERE id = ${subId}`
+    const extra = await createBookingForUser(db, params)
     if (!extra.ok) throw new Error(extra.message)
     assert.equal(extra.coveredByPlan, false)
     await sql`INSERT INTO payment (id, user_id, booking_id, amount, method, status)
@@ -53,7 +62,7 @@ test("PostgreSQL: extra individual, cancelación y clase tomada", { skip: !enabl
     assert.equal(cancelled.ok, true)
     if (cancelled.ok) assert.equal(cancelled.restoredClass, false)
     const [balance] = await sql`SELECT classes_remaining FROM subscription WHERE id = ${subId}`
-    assert.equal(balance.classes_remaining, 9)
+    assert.equal(balance.classes_remaining, 0)
     const [payment] = await sql`SELECT status FROM payment WHERE booking_id = ${extra.bookingId}`
     assert.equal(payment.status, 'cancelled')
     assert.equal((await cancelBookingById(db, extra.bookingId, { bypassPolicy: true })).ok, false)

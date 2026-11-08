@@ -211,5 +211,10 @@
   "es.schedule.classTaken": "Ya marcaste esta clase como tomada",
   "es.booking.ownBookingTaken": "Ya marcaste esta clase como tomada. Queda registrada y ya no se puede cambiar ni liberar.",
   "es.booking.ownBookingTake": "Tomar clase",
-  "es.booking.ownBookingTakeLater": "Podrás marcarla como tomada cuando empiece la clase."
+  "es.booking.ownBookingTakeLater": "Podrás marcarla como tomada cuando empiece la clase.",
+  "es.setup.weekly.schedule.planProgress": "{{used}} de {{total}} clases",
+  "es.setup.weekly.schedule.planWeekSuggested": "Sugerido: {{limit}} por semana · esta semana llevas {{used}}",
+  "es.booking.planProgress": "Llevas {{used}} de {{total}} clases",
+  "es.booking.planDaysPerWeekSuggested": "Sugerido: {{count}} por semana",
+  "es.booking.planWeekSuggestionOver": "Tu plan sugiere {{limit}} clases por semana y esta semana ya llevas {{used}}. Puedes reservar igual: la clase se descuenta de tu plan."
 }

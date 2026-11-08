@@ -106,17 +106,23 @@ export type BookableSubscriptionCheck =
       subscriptionId: string
       /** El plan cubre la clase, pero la alumna tiene que saber algo antes. */
       warning?: string
+      /**
+       * La semana ya llegó a las clases que sugiere el plan. No frena la
+       * reserva: sólo se le avisa y la clase se descuenta igual.
+       */
+      overWeeklySuggestion?: { limit: number; usedThisWeek: number }
     }
   | {
       ok: false
       message: string
-      reason?: "no_subscription" | "expired" | "no_classes" | "weekly_limit"
+      reason?: "no_subscription" | "expired" | "no_classes"
       subscriptionId?: string
     }
 
 /**
  * Reservas confirmadas de la alumna dentro de la semana del estudio (lunes a
- * domingo) en la que cae `bookingDate`. Es lo que topa `daysPerWeek`.
+ * domingo) en la que cae `bookingDate`. Se compara contra `daysPerWeek`, que es
+ * una sugerencia y no un tope.
  */
 export async function countConfirmedBookingsInStudioWeek(
   db: AnyDb,
@@ -211,24 +217,18 @@ export async function checkBookableSubscriptionForUser(
     }
   }
 
-  // El tope semanal es lo que hace que una quincenal de 3 por semana no se
-  // tome sus 6 clases en una sola semana.
+  // Las clases por semana del plan son una sugerencia: la alumna reparte sus
+  // clases como quiera y sólo se le avisa cuando pasa de lo sugerido.
+  let overWeeklySuggestion: { limit: number; usedThisWeek: number } | undefined
   const weeklyLimit = planWeeklyLimit(primary)
   if (weeklyLimit != null && bookingDate != null) {
     const usedThisWeek = await countConfirmedBookingsInStudioWeek(db, userId, bookingDate)
     if (usedThisWeek >= weeklyLimit) {
-      return {
-        ok: false,
-        message:
-          `Tu plan incluye ${weeklyLimit} ${weeklyLimit === 1 ? "clase" : "clases"} por semana y ya alcanzaste ese límite entre reservas y clases tomadas. ` +
-          "Para cualquier situación, acude con un administrador.",
-        reason: "weekly_limit",
-        subscriptionId: primary.id,
-      }
+      overWeeklySuggestion = { limit: weeklyLimit, usedThisWeek }
     }
   }
 
-  return { ok: true, subscriptionId: primary.id, warning }
+  return { ok: true, subscriptionId: primary.id, warning, overWeeklySuggestion }
 }
 
 export async function createBookingForUser(
@@ -240,12 +240,6 @@ export async function createBookingForUser(
     birthdate?: string | null
     /** Exige plan vigente con clases. Por defecto se permite reservar y cobrar después. */
     requirePlan?: boolean
-    /**
-     * Corta la reserva cuando ya se usó el tope semanal del plan. Va en el
-     * camino de la alumna; el mostrador se queda sin él para poder resolver el
-     * caso a mano, que es a lo que la manda el mensaje.
-     */
-    enforceWeeklyLimit?: boolean
   },
 ): Promise<CreateBookingResult> {
   const [slot] = await db
@@ -324,14 +318,6 @@ export async function createBookingForUser(
     params.bookingDate,
   )
   const subscriptionId = subCheck.ok ? subCheck.subscriptionId : null
-
-  if (
-    !subCheck.ok &&
-    subCheck.reason === "weekly_limit" &&
-    params.enforceWeeklyLimit === true
-  ) {
-    return { ok: false, message: subCheck.message }
-  }
 
   if (subscriptionId == null && params.requirePlan === true) {
     return { ok: false, message: subCheck.ok ? "" : subCheck.message }

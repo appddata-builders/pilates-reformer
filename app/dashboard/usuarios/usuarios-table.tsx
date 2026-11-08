@@ -39,7 +39,8 @@ export type UsuarioTableRow = {
   renewalLabel: string
   showExpiryAlert: boolean
   birthdayToday: boolean
-  birthdaySoon: boolean
+  /** "Cumple mañana" / "Cumple el jueves 12 de noviembre"; null si no es en 7 días. */
+  birthdaySoonLabel: string | null
 }
 
 function subscriptionColumnBadge(hasSubscription: boolean, userEnabled: boolean) {
@@ -173,8 +174,8 @@ export function UsuariosTable(props: {
                 <TableCell>
                   {row.birthdayToday ? (
                     <Badge className="bg-sky-100 text-sky-800 border-sky-200">Cumple hoy</Badge>
-                  ) : row.birthdaySoon ? (
-                    <Badge className="bg-blue-100 text-blue-800 border-blue-200">Cumple pronto</Badge>
+                  ) : row.birthdaySoonLabel != null ? (
+                    <Badge className="bg-blue-100 text-blue-800 border-blue-200">{row.birthdaySoonLabel}</Badge>
                   ) : row.showExpiryAlert ? (
                     <Badge className="bg-orange-100 text-orange-800 border-orange-200">3 días</Badge>
                   ) : (

@@ -13,7 +13,11 @@ import {
 } from "@/lib/list-sort"
 import { PageHeader } from "@/components/features/admin/page-header"
 import { sortPlansByDisplayOrder } from "@/lib/site/plans"
-import { isBirthdayToday, isBirthdayWithinNextDays } from "@/lib/birthday-notifications"
+import {
+  birthdaySoonLabel,
+  isBirthdayToday,
+  nextBirthdayWithinDays,
+} from "@/lib/birthday-notifications"
 import { pickPrimarySubscription, subscriptionEndDate } from "@/lib/subscription-display"
 import { ALUMNO_ROLE_LABEL } from "@/lib/user-role"
 import { NewCoachDialog } from "@/app/dashboard/coaches/new-coach-dialog"
@@ -246,7 +250,7 @@ export default async function AlumnosPage({ searchParams }: { searchParams: Sear
     const daysToEnd = sub ? calendarDaysUntilEnd(today, sub.endDate) : null
     const showExpiryAlert = daysToEnd !== null && daysToEnd === expiryDaysThreshold
     const birthdayToday = isBirthdayToday(alumno.birthdate)
-    const birthdaySoon = !birthdayToday && isBirthdayWithinNextDays(alumno.birthdate, 7)
+    const nextBirthday = birthdayToday ? null : nextBirthdayWithinDays(alumno.birthdate, 7)
     const userEnabled = alumno.enabled !== false
 
     return {
@@ -268,7 +272,7 @@ export default async function AlumnosPage({ searchParams }: { searchParams: Sear
         sub?.endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short" }) ?? "—",
       showExpiryAlert,
       birthdayToday,
-      birthdaySoon,
+      birthdaySoonLabel: nextBirthday == null ? null : birthdaySoonLabel(nextBirthday),
     }
   })
 

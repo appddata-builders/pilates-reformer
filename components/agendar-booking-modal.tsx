@@ -199,12 +199,16 @@ function AgendarBookingForm(props: {
   const [willBeCharged, setWillBeCharged] = useState<{
     priceMxn: number
     planName: string
-    weeklyLimitReached?: boolean
   } | null>(null)
   const [trialAvailable, setTrialAvailable] = useState(false)
   const [useTrialClass, setUseTrialClass] = useState(false)
   const [activePlan, setActivePlan] = useState<ActivePlanSummary | null>(null)
   const [planWarning, setPlanWarning] = useState<string | null>(null)
+  // Ya va en las clases sugeridas por semana: se avisa, pero se reserva igual.
+  const [overWeeklySuggestion, setOverWeeklySuggestion] = useState<{
+    limit: number
+    usedThisWeek: number
+  } | null>(null)
   // Otra clase el mismo día: se confirma una vez y sólo para esa fecha/horario.
   // Ambos estados guardan A CUÁL reserva aplican en vez de un booleano, así la
   // confirmación caduca sola al cambiar de fecha u horario y no hace falta un
@@ -318,6 +322,7 @@ function AgendarBookingForm(props: {
       setUseTrialClass(false)
       setActivePlan(null)
       setPlanWarning(null)
+      setOverWeeklySuggestion(null)
       setSameDayBooking(null)
       setOwnBooking(null)
       setSuggestedPlans([])
@@ -334,6 +339,7 @@ function AgendarBookingForm(props: {
         setWillBeCharged(res.ok ? (res.willBeCharged ?? null) : null)
         setActivePlan(res.ok ? (res.activePlan ?? null) : null)
         setPlanWarning(res.ok ? (res.planWarning ?? null) : null)
+        setOverWeeklySuggestion(res.ok ? (res.overWeeklySuggestion ?? null) : null)
         setSameDayBooking(res.ok ? (res.sameDayBooking ?? null) : null)
         setOwnBooking(res.ownBooking ?? null)
         setSuggestedPlans(res.ok ? (res.suggestedPlans ?? []) : [])
@@ -560,6 +566,14 @@ function AgendarBookingForm(props: {
           <div className="space-y-1 rounded-inner border border-green-base/30 bg-green-base/5 px-4 py-3 text-sm">
             <p className="font-medium text-green-base">{t("booking.planActiveTitle")}</p>
             <p className="font-semibold text-[#1b1a18]">{activePlan.name}</p>
+            {activePlan.classesTotal != null ? (
+              <p className="text-[#1b1a18]">
+                {t("booking.planProgress", {
+                  used: activePlan.classesUsed,
+                  total: activePlan.classesTotal,
+                })}
+              </p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-black/60">
               {activePlan.expired ? null : (
                 <>
@@ -590,13 +604,21 @@ function AgendarBookingForm(props: {
               {activePlan.classesRemaining != null && activePlan.daysPerWeek != null ? (
                 <>
                   <span aria-hidden>·</span>
-                  <span>{t("booking.planDaysPerWeek", { count: activePlan.daysPerWeek })}</span>
+                  <span>{t("booking.planDaysPerWeekSuggested", { count: activePlan.daysPerWeek })}</span>
                 </>
               ) : null}
             </div>
             {planWarning != null ? (
               <p className="mt-2 rounded-inner border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
                 {planWarning}
+              </p>
+            ) : null}
+            {overWeeklySuggestion != null ? (
+              <p className="mt-2 rounded-inner border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                {t("booking.planWeekSuggestionOver", {
+                  limit: overWeeklySuggestion.limit,
+                  used: overWeeklySuggestion.usedThisWeek,
+                })}
               </p>
             ) : null}
             {/* Barra de vigencia: 30 días es el ciclo típico del estudio. */}
@@ -614,11 +636,7 @@ function AgendarBookingForm(props: {
           </div>
         ) : sameDayBooking == null && willBeCharged != null && sessionUser != null && scheduleSlotId !== "" ? (
           <div className="space-y-3 rounded-inner border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <p className="font-medium">
-              {willBeCharged.weeklyLimitReached
-                ? "Alcanzaste el límite semanal de tu plan. Puedes comprar una clase individual adicional; no se descontará de tu plan."
-                : t("agendar.booking.modal.text013")}
-            </p>
+            <p className="font-medium">{t("agendar.booking.modal.text013")}</p>
             {trialAvailable ? (
               <>
                 <div className="space-y-2">
@@ -804,8 +822,6 @@ function AgendarBookingForm(props: {
               "Iniciar sesión para reservar"
             ) : pending ? (
               "Guardando..."
-            ) : willBeCharged?.weeklyLimitReached ? (
-              `Comprar clase individual · ${formatMxn(willBeCharged.priceMxn)}`
             ) : (
               t("booking.confirm")
             )}

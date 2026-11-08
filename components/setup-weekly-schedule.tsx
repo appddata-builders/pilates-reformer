@@ -135,12 +135,13 @@ export default function SetupWeeklySchedule({
   const takenKeys = new Set(ctx.takenBookingKeys)
   const individualKeys = new Set(ctx.individualBookingKeys)
   const plan = ctx.plan
-  // El tope semanal se mide contra la semana que se está viendo, no contra hoy:
-  // el tablero deja moverse a semanas futuras y cada una lleva su propia cuenta.
+  // Las clases por semana del plan son una sugerencia, no un tope. Se miden
+  // contra la semana que se está viendo: el tablero deja moverse a semanas
+  // futuras y cada una lleva su propia cuenta.
   const weekKey = dateStrForWeekDay(monday, 1)
   const usedThisWeek = ctx.weeklyUsage[weekKey] ?? 0
   const weeklyLimit = plan?.weeklyLimit ?? null
-  const weekLimitReached = weeklyLimit != null && usedThisWeek >= weeklyLimit
+  const overWeeklySuggestion = weeklyLimit != null && usedThisWeek > weeklyLimit
 
   function isMine(slotId: string, dateStr: string): boolean {
     return myBookingKeys.has(`${slotId}|${dateStr}`)
@@ -183,9 +184,16 @@ export default function SetupWeeklySchedule({
     onSelectClass({ slotId: slot.id, bookingDate })
   }
 
+  /** "3 de 12 clases": las que lleva del plan y de cuántas. */
   function planSummary(): string | null {
     if (plan == null) return null
     if (plan.isUnlimited) return t("setup.weekly.schedule.planUnlimited")
+    if (plan.classesTotal != null) {
+      return t("setup.weekly.schedule.planProgress", {
+        used: plan.classesUsed,
+        total: plan.classesTotal,
+      })
+    }
     const left = plan.classesRemaining ?? 0
     if (left <= 0) return t("setup.weekly.schedule.planNoneRemaining")
     if (left === 1) return t("setup.weekly.schedule.planOneRemaining")
@@ -235,17 +243,16 @@ export default function SetupWeeklySchedule({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-inner border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-semibold sm:text-xs">
           <span className="text-white">{plan.name}</span>
           {planSummary() != null ? (
-            <span className="text-white/75">· {planSummary()}</span>
+            <span className="rounded-full bg-white px-2 py-0.5 text-green-base">
+              {planSummary()}
+            </span>
           ) : null}
           {weeklyLimit != null ? (
-            <span className={weekLimitReached ? "text-amber-200" : "text-white/75"}>
-              ·{" "}
-              {weekLimitReached
-                ? t("setup.weekly.schedule.planWeekFull", { limit: weeklyLimit })
-                : t("setup.weekly.schedule.planWeekUsage", {
-                    used: usedThisWeek,
-                    limit: weeklyLimit,
-                  })}
+            <span className={overWeeklySuggestion ? "text-amber-200" : "text-white/75"}>
+              {t("setup.weekly.schedule.planWeekSuggested", {
+                limit: weeklyLimit,
+                used: usedThisWeek,
+              })}
             </span>
           ) : null}
           {plan.expired ? (
@@ -322,8 +329,7 @@ export default function SetupWeeklySchedule({
                         bookingWindowMinutes,
                       })
                       const full = isBoardSlotFull(enrolled, slot.capacity)
-                      // El tope semanal NO deshabilita celdas: con la semana llena
-                      // todavía se puede cambiar de hora o liberar una reserva.
+                      // Las clases sugeridas por semana no deshabilitan celdas.
                       // Sólo se apagan las que ya pasaron, las inhabilitadas y las
                       // llenas. La propia reserva siempre se puede abrir.
                       const canOpen =
@@ -345,9 +351,7 @@ export default function SetupWeeklySchedule({
                               ? t("schedule.classUnavailable")
                               : full
                                 ? t("schedule.classFull")
-                                : weekLimitReached
-                                  ? t("schedule.classWeekLimit", { limit: weeklyLimit ?? 0 })
-                                  : t("schedule.enrollment", { enrolled, capacity: slot.capacity })
+                                : t("schedule.enrollment", { enrolled, capacity: slot.capacity })
 
                       return (
                         <td

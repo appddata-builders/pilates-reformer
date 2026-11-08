@@ -27,21 +27,34 @@ export function isBirthdayToday(birthdate: string | null | undefined): boolean {
   return key === todayMonthDayKey()
 }
 
-export function isBirthdayWithinNextDays(
+/** Fecha del próximo cumpleaños si cae en los siguientes `days` días (sin contar hoy). */
+export function nextBirthdayWithinDays(
   birthdate: string | null | undefined,
   days: number,
-): boolean {
-  if (birthdate == null || birthdate.trim() === "") return false
+  from: Date = new Date(),
+): { date: Date; daysAway: number } | null {
+  if (birthdate == null || birthdate.trim() === "") return null
   const key = birthdateMonthDayKey(birthdate)
-  if (key == null) return false
-  const today = new Date()
+  if (key == null) return null
+  const today = new Date(from)
   today.setHours(12, 0, 0, 0)
   for (let i = 1; i <= days; i++) {
     const d = new Date(today)
     d.setDate(today.getDate() + i)
-    if (todayMonthDayKey(d) === key) return true
+    if (todayMonthDayKey(d) === key) return { date: d, daysAway: i }
   }
-  return false
+  return null
+}
+
+/** "Cumple mañana" o "Cumple el jueves 12 de noviembre", para la tabla de usuarios. */
+export function birthdaySoonLabel(next: { date: Date; daysAway: number }): string {
+  if (next.daysAway === 1) return "Cumple mañana"
+  const day = next.date.toLocaleDateString("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
+  return `Cumple el ${day}`
 }
 
 export async function sendTodayBirthdayNotifications(db: AnyDb): Promise<number> {

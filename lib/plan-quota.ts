@@ -9,8 +9,8 @@
  *   Equilibrio  semanal 3 · quincenal 6  · mensual 12
  *   Vitalidad   semanal 5 · quincenal 10 · mensual 20
  *
- * Las dos reglas conviven: el total topa el periodo completo y `daysPerWeek`
- * topa cada semana, para que una quincenal no se tome sus 6 clases en 3 días.
+ * El total topa el periodo completo. `daysPerWeek` es sólo una sugerencia por
+ * semana: la alumna puede tomar sus clases como quiera dentro del periodo.
  */
 
 export type PlanQuotaRow = {
@@ -35,7 +35,7 @@ export function planIncludedClasses(plan: PlanQuotaRow): number | null {
   return plan.totalClasses ?? null
 }
 
-/** Tope de clases por semana del estudio (lunes a domingo). `null` es sin tope. */
+/** Clases sugeridas por semana del estudio (lunes a domingo). `null` es sin sugerencia. */
 export function planWeeklyLimit(plan: {
   planType: string
   daysPerWeek: number
