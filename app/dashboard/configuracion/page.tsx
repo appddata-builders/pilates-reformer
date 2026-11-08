@@ -7,7 +7,8 @@ import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import { ConfigFormsClient } from "./config-forms"
-import { parseNavPermissionsJson } from "@/lib/nav-permissions"
+import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding-constants"
+import { parseNavPermissionsJson, permissionsEditorFor } from "@/lib/nav-permissions"
 
 export default async function ConfiguracionPage() {
   const session = await getSession()
@@ -20,7 +21,7 @@ export default async function ConfiguracionPage() {
   const [policy] = await db.select().from(schema.studioPolicy).where(eq(schema.studioPolicy.id, "main")).limit(1)
 
   const values = {
-    studioName: policy?.studioName ?? "Pilates Studio",
+    studioName: policy?.studioName ?? DEFAULT_STUDIO_NAME,
     logoUrl: policy?.logoUrl ?? null,
     cancelMinutes: policy?.cancelMinutes ?? 90,
     bookingWindowMinutes: policy?.bookingWindowMinutes ?? 5,
@@ -40,6 +41,7 @@ export default async function ConfiguracionPage() {
     <ConfigFormsClient
       policy={values}
       isRoot={role === "root"}
+      permissionsEditor={permissionsEditorFor(role)}
       navPermissions={navPermissions}
     />
   )

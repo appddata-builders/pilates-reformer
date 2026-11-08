@@ -22,6 +22,11 @@ import { WelcomeModal } from "./_welcome-modal"
 import { sendTodayBirthdayNotifications } from "@/lib/birthday-notifications"
 import { sendPlanRenewalReminders } from "@/lib/plan-requests"
 import { getStudioBranding } from "@/lib/studio-branding"
+import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding-constants"
+import type { Metadata } from "next"
+
+// La pestaña del panel lleva sólo la marca, sin depender de los textos de la landing.
+export const metadata: Metadata = { title: DEFAULT_STUDIO_NAME }
 
 export default async function DashboardLayout({
   children,

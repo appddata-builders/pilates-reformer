@@ -1,4 +1,4 @@
-# Guía de acceso — Pilates Reformer (Appstract)
+# Guía de acceso — Studio 57 (Appstract)
 
 **Versión:** Demostración · datos fake de `scripts/postgres-manual/03-seed-fake.sql` (mayo 2026)
 
@@ -10,8 +10,8 @@ Esta guía explica cómo entrar y explorar el **sistema de gestión** con los da
 
 Pueden hacer clic, crear cambios de prueba y salir cuando gusten. Es reversible: los datos viven en la base de datos de demo, no en producción real.
 
-> El **landing** (`/`) muestra la marca **Studio 57 · Pilates reformer** (demo de producto Appstract).  
-> Tras cargar el seed, el **dashboard** usa el nombre de estudio **Pilates Studio** (configuración en `studio_policy`).
+> El **landing** (`/`) muestra la marca **Studio 57** (demo de producto Appstract).  
+> Tras cargar el seed, el **dashboard** usa el nombre de estudio **Studio 57** (configuración en `studio_policy`).
 
 ---
 
@@ -96,7 +96,7 @@ Todas las contraseñas son **solo para demostración**. No las usen en la vida r
 
 | Campo | Valor demo |
 |-------|------------|
-| Nombre | Pilates Studio |
+| Nombre | Studio 57 |
 | Color de marca | `#1b2d6e` |
 | Aforo máximo por clase | 8 |
 | Horas para cancelar | 12 |
@@ -145,7 +145,7 @@ aparte, en una barra sin foto justo debajo de las tarjetas.
 
 ## Horarios de clase (seed)
 
-Coaches en turnos: **Elena Morales** y **Lucía Paredes**. Clase: **Pilates Reformer**, capacidad **8**.
+Coaches en turnos: **Elena Morales** y **Lucía Paredes**. Clase: **Studio 57**, capacidad **8**.
 
 Parrilla completa de **lunes a sábado** (48 horarios), en los dos turnos del estudio:
 
@@ -194,7 +194,7 @@ Matutino a cargo de **Elena Morales** y vespertino de **Lucía Paredes**; el sá
 | **Reportes** | Métricas y aforo |
 | **Devoluciones** | Devolución de Alma Delgado |
 | **Histórico** | Actividad pasada |
-| **Configuración** | Nombre **Pilates Studio**, capacidad, políticas |
+| **Configuración** | Nombre **Studio 57**, capacidad, políticas |
 
 ### Con **root** (`operador@demo.pilates.mx`)
 

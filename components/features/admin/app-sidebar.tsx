@@ -22,6 +22,7 @@ import { Input } from "@/components/shared/ui/input"
 import { Badge } from "@/components/shared/ui/badge"
 import { routes } from "@/lib/routes"
 import { cn } from "@/lib/utils"
+import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding-constants"
 import { DashboardBrand } from "@/components/features/admin/dashboard-brand"
 
 interface AppSidebarProps {
@@ -52,7 +53,7 @@ function navItemMatchesQuery(item: AdminNavItem, query: string): boolean {
 export function AppSidebar({
   role = "admin",
   navPermissions,
-  studioName = "Pilates Studio",
+  studioName = DEFAULT_STUDIO_NAME,
   logoUrl = null,
 }: Readonly<AppSidebarProps>) {
   const pathname = usePathname()

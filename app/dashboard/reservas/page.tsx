@@ -5,7 +5,7 @@ import { AttendanceControls } from "../coaches/attendance/attendance-controls"
 import { getSession } from "@/lib/session"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
-import { and, asc, count, eq, gte, inArray, isNull, lte } from "drizzle-orm"
+import { and, asc, count, eq, gte, inArray, isNull } from "drizzle-orm"
 import { isAlumnoRole, getSessionUserId } from "@/lib/alumno-scope"
 import {
   classStartFromBooking,
@@ -18,10 +18,10 @@ import {
 } from "@/lib/subscription-display"
 import { ListPagination } from "@/components/features/admin/list-pagination"
 import { LIST_PAGE_SIZE, listPaginationOffset, parseListPage } from "@/lib/list-pagination"
-import { routes } from "@/lib/routes"
+import { routes, siteSections } from "@/lib/routes"
 import { PageHeader } from "@/components/features/admin/page-header"
 import { Button } from "@/components/shared/ui/button"
-import { dateRangeForDay, localTodayStr } from "@/lib/booking-slot-options"
+import { dateRangeForDay, formatBookingDateEs, localTodayStr, toLocalDateStr } from "@/lib/booking-slot-options"
 import Link from "next/link"
 import { ReservaCard } from "./reserva-card"
 import { PendingPaymentsPanel, type PendingPaymentRow } from "./pending-payments-panel"
@@ -35,22 +35,22 @@ function isAdminOrRoot(role: string) {
   return role === "admin" || role === "root"
 }
 
-type SearchParams = Promise<{ date?: string; page?: string; alumna?: string }>
+type SearchParams = Promise<{ page?: string; alumna?: string }>
 
 export default async function ReservasPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
   const todayStr = localTodayStr()
-  const dateStr = params.date ?? todayStr
   const page = parseListPage(params.page)
   const offset = listPaginationOffset(page)
   const alumnaFilter = params.alumna ?? ""
 
   const listQuery: Record<string, string | undefined> = {
-    date: dateStr !== todayStr ? dateStr : undefined,
     alumna: alumnaFilter.length > 0 ? alumnaFilter : undefined,
   }
 
-  const { start: selectedDate, end: endOfDay } = dateRangeForDay(dateStr)
+  // Sin filtro de fechas: se listan las reservas de hoy en adelante. Las que ya
+  // pasaron viven en Histórico.
+  const { start: startOfToday } = dateRangeForDay(todayStr)
 
   const session = await getSession()
   const role = session?.user?.role ?? ""
@@ -187,10 +187,7 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
       .orderBy(schema.user.name)
   }
 
-  const bookingConditions = [
-    gte(schema.booking.bookingDate, selectedDate),
-    lte(schema.booking.bookingDate, endOfDay),
-  ]
+  const bookingConditions = [gte(schema.booking.bookingDate, startOfToday)]
 
   if (isAlumno && userId != null) {
     bookingConditions.push(eq(schema.booking.userId, userId))
@@ -198,13 +195,13 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
     bookingConditions.push(eq(schema.booking.userId, alumnaFilter))
   }
 
-  const dateFilter = and(...bookingConditions)
+  const upcomingFilter = and(...bookingConditions)
 
   const [{ total: totalReservas }] = await db
     .select({ total: count() })
     .from(schema.booking)
     .innerJoin(schema.scheduleSlot, eq(schema.booking.scheduleSlotId, schema.scheduleSlot.id))
-    .where(dateFilter)
+    .where(upcomingFilter)
 
   const totalItems = Number(totalReservas)
 
@@ -227,8 +224,12 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
     .from(schema.booking)
     .innerJoin(schema.user, eq(schema.booking.userId, schema.user.id))
     .innerJoin(schema.scheduleSlot, eq(schema.booking.scheduleSlotId, schema.scheduleSlot.id))
-    .where(dateFilter)
-    .orderBy(asc(schema.scheduleSlot.startTime), asc(schema.user.name))
+    .where(upcomingFilter)
+    .orderBy(
+      asc(schema.booking.bookingDate),
+      asc(schema.scheduleSlot.startTime),
+      asc(schema.user.name),
+    )
     .limit(LIST_PAGE_SIZE)
     .offset(offset)
 
@@ -275,29 +276,43 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
     ).ok
   }
 
-  const description = isAlumno
-    ? `${totalItems} ${totalItems === 1 ? "reserva" : "reservas"} en este día`
-    : isCoach
-      ? `${totalItems} reservas en este día`
-      : alumnaFilter.length > 0
-        ? (() => {
-            const a = alumnas.find((x) => x.id === alumnaFilter)
-            if (a == null) return `${totalItems} reservas en este día`
-            return `${totalItems} reservas · ${a.name}`
-          })()
-        : `${totalItems} reservas en este día`
+  const countLabel = `${totalItems} ${totalItems === 1 ? "reserva próxima" : "reservas próximas"}`
+  const filteredAlumna =
+    isAdminRoot && alumnaFilter.length > 0
+      ? alumnas.find((x) => x.id === alumnaFilter)
+      : undefined
+  const description =
+    filteredAlumna != null ? `${countLabel} · ${filteredAlumna.name}` : countLabel
 
   const emptyMessage = isAlumno
-    ? "No tienes reservas para esta fecha"
-    : "Sin reservas para esta fecha"
+    ? "No tienes reservas próximas"
+    : "Sin reservas próximas"
+
+  // Las reservas se agrupan por día para que se vea qué fecha es cada una.
+  const reservasByDay: { dateStr: string; rows: typeof reservas }[] = []
+  for (const r of reservas) {
+    const bookingDate =
+      r.bookingDate instanceof Date
+        ? r.bookingDate
+        : new Date(r.bookingDate as unknown as number)
+    const key = toLocalDateStr(bookingDate)
+    const last = reservasByDay[reservasByDay.length - 1]
+    if (last != null && last.dateStr === key) last.rows.push(r)
+    else reservasByDay.push({ dateStr: key, rows: [r] })
+  }
 
   return (
     <div className="p-6 space-y-6">
       <PageHeader title="Reservas" description={description}>
         {canManage || isAlumno ? (
-          <Button asChild className="gap-2">
-            <Link href={routes.agendar}>Agendar clase</Link>
-          </Button>
+          <>
+            <Button asChild variant="outline" className="gap-2">
+              <Link href={siteSections.planes}>Ver planes</Link>
+            </Button>
+            <Button asChild className="gap-2">
+              <Link href={routes.agendar}>Agendar clase</Link>
+            </Button>
+          </>
         ) : null}
       </PageHeader>
 
@@ -318,13 +333,13 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
 
       <PendingPaymentsPanel rows={pendingPayments} userName={session?.user.name ?? ""} />
 
-      <form
-        data-tour="reservas-filter"
-        method="get"
-        action={routes.reservas}
-        className="flex flex-wrap gap-2 items-end"
-      >
-        {isAdminRoot ? (
+      {isAdminRoot ? (
+        <form
+          data-tour="reservas-filter"
+          method="get"
+          action={routes.reservas}
+          className="flex flex-wrap gap-2 items-end"
+        >
           <div className="space-y-1 min-w-[220px]">
             <label htmlFor="alumna" className="text-sm text-muted-foreground">
               Alumna
@@ -343,56 +358,58 @@ export default async function ReservasPage({ searchParams }: { searchParams: Sea
               ))}
             </select>
           </div>
-        ) : null}
-        <div className="space-y-1">
-          <label htmlFor="date" className="text-sm text-muted-foreground">
-            Fecha
-          </label>
-          <input
-            id="date"
-            type="date"
-            name="date"
-            defaultValue={dateStr}
-            className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          />
-        </div>
-        <Button type="submit" variant="outline" size="sm">
-          Filtrar
-        </Button>
-      </form>
+          <Button type="submit" variant="outline" size="sm">
+            Filtrar
+          </Button>
+        </form>
+      ) : null}
 
       {reservas.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-12">{emptyMessage}</p>
       ) : (
-        <div data-tour="page-table" className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {reservas.map((r) => (
-            <div key={r.id} className="flex h-full flex-col">
-              <ReservaCard
-                reserva={{
-                  id: r.id,
-                  status: r.status,
-                  className: r.className,
-                  startTime: r.startTime,
-                  endTime: r.endTime,
-                  instructor: r.instructor,
-                  alternateInstructor: r.alternateInstructor,
-                  scheduleMode: r.scheduleMode,
-                  studentName: r.userName,
-                }}
-                showAlumna={showAlumnaOnCard}
-                individual={individualBookingIds.has(r.id)}
-                canCancel={
-                  staffCanCancel || (isAlumno && alumnoCanCancelBooking(r))
-                }
-                cancelMode={isAlumno ? "self" : "admin"}
-              />
-              {r.status === "confirmed" && (isAdminRoot || isCoach) ? (
-                <div className="space-y-2 border rounded-md p-3 mt-2">
-                  <p className="text-xs text-muted-foreground">{r.userEmail}</p>
-                  <AttendanceControls bookingId={r.id} attended={r.attended} catalog={attendanceCatalog} />
-                </div>
-              ) : null}
-            </div>
+        <div data-tour="page-table" className="space-y-6">
+          {reservasByDay.map((day) => (
+            <section key={day.dateStr} className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground first-letter:uppercase">
+                {formatBookingDateEs(day.dateStr)}
+                {day.dateStr === todayStr ? (
+                  <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    Hoy
+                  </span>
+                ) : null}
+              </h2>
+              <div className="grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {day.rows.map((r) => (
+                  <div key={r.id} className="flex h-full flex-col">
+                    <ReservaCard
+                      reserva={{
+                        id: r.id,
+                        status: r.status,
+                        className: r.className,
+                        startTime: r.startTime,
+                        endTime: r.endTime,
+                        instructor: r.instructor,
+                        alternateInstructor: r.alternateInstructor,
+                        scheduleMode: r.scheduleMode,
+                        studentName: r.userName,
+                      }}
+                      showAlumna={showAlumnaOnCard}
+                      individual={individualBookingIds.has(r.id)}
+                      canCancel={
+                        staffCanCancel || (isAlumno && alumnoCanCancelBooking(r))
+                      }
+                      cancelMode={isAlumno ? "self" : "admin"}
+                    />
+                    {r.status === "confirmed" && (isAdminRoot || isCoach) ? (
+                      <div className="space-y-2 border rounded-md p-3 mt-2">
+                        <p className="text-xs text-muted-foreground">{r.userEmail}</p>
+                        <AttendanceControls bookingId={r.id} attended={r.attended} catalog={attendanceCatalog} />
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}

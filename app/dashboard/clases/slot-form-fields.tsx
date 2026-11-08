@@ -17,8 +17,8 @@ const DAY_OPTIONS = [
 ]
 
 const TYPE_OPTIONS = [
-  { value: "reformer", label: "Pilates Reformer" },
-  { value: "mat", label: "Pilates Mat" },
+  { value: "reformer", label: "Reformer" },
+  { value: "mat", label: "Mat" },
   { value: "barre", label: "Barre" },
   { value: "mayores_60", label: "Especial para mayores de 60 años" },
   { value: "otro", label: "Otro" },
@@ -85,10 +85,6 @@ export function SlotFormFields(props: {
   const v = props.values
   const err = props.fieldErrors
   const instructorValue = v?.instructor ?? ""
-  const alternateInstructorValue = v?.alternateInstructor ?? ""
-  const startsDual =
-    v?.scheduleMode === "dual" || v?.scheduleMode === "alternating_weekly"
-  const [dualCoach, setDualCoach] = useState(startsDual)
 
   const defaultStart = v?.startTime ?? "07:00"
   const defaultEnd =
@@ -114,7 +110,8 @@ export function SlotFormFields(props: {
 
   return (
     <>
-      <input type="hidden" name="scheduleMode" value={dualCoach ? "dual" : "fixed"} />
+      {/* Una sola coach por clase: el modo de 2 coaches que rotaban ya no se usa. */}
+      <input type="hidden" name="scheduleMode" value="fixed" />
       <div className="space-y-2">
         <Label htmlFor={`${props.idPrefix}-className`}>Nombre de la clase</Label>
         <Input
@@ -126,46 +123,13 @@ export function SlotFormFields(props: {
         />
         {err?.className ? <p className="text-destructive text-sm">{err.className[0]}</p> : null}
       </div>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input
-          type="checkbox"
-          checked={dualCoach}
-          onChange={(e) => setDualCoach(e.target.checked)}
-          className="h-4 w-4 rounded border-input"
-        />
-        <span>Esta clase tiene 2 coaches (rotan fines de semana)</span>
-      </label>
-      {dualCoach ? (
-        <>
-          <CoachSelect
-            id={`${props.idPrefix}-instructor`}
-            name="instructor"
-            label="Coach 1"
-            value={instructorValue}
-            coaches={props.coaches}
-            required
-          />
-          <CoachSelect
-            id={`${props.idPrefix}-alternateInstructor`}
-            name="alternateInstructor"
-            label="Coach 2"
-            value={alternateInstructorValue}
-            coaches={props.coaches}
-            required
-          />
-          <p className="text-xs text-muted-foreground">
-            Ambas aparecen en el horario. Quién da la clase ese día lo coordinan ustedes.
-          </p>
-        </>
-      ) : (
-        <CoachSelect
-          id={`${props.idPrefix}-instructor`}
-          name="instructor"
-          label="Instructor"
-          value={instructorValue}
-          coaches={props.coaches}
-        />
-      )}
+      <CoachSelect
+        id={`${props.idPrefix}-instructor`}
+        name="instructor"
+        label="Instructor"
+        value={instructorValue}
+        coaches={props.coaches}
+      />
       {props.coaches.length === 0 ? (
         <p className="text-xs text-muted-foreground">No hay coaches registrados en el sistema.</p>
       ) : null}

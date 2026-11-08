@@ -22,3 +22,8 @@ export const routes = {
   calendario: "/dashboard/calendario",
   historico: "/dashboard/historico",
 } as const
+
+/** Secciones de la página principal a las que se enlaza desde el panel. */
+export const siteSections = {
+  planes: "/#planes",
+} as const

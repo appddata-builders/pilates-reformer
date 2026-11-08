@@ -1,4 +1,4 @@
-# Flujos y módulos — Pilates Reformer (Studio 57)
+# Flujos y módulos — Studio 57
 
 Documentación visual de lo implementado en `appstract/pilates-reformer`.
 
@@ -165,7 +165,7 @@ flowchart TD
 
 ```mermaid
 flowchart TB
-  ROOT((Pilates Reformer))
+  ROOT((Studio 57))
 
   ROOT --> SITIO[Sitio público]
   SITIO --> S1[Landing /]

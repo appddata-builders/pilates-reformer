@@ -9,6 +9,7 @@ import {
   REGISTRY_GENERIC_ERROR,
 } from "@/lib/registry-errors"
 import { sendWelcomeNotification } from "@/lib/welcome-message"
+import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding-constants"
 import { CognitoPasswordError, EmailTakenError } from "@/lib/cognito"
 import { createUserAccount } from "@/lib/user-accounts"
 import { requestPlan } from "@/lib/plan-requests"
@@ -148,7 +149,7 @@ export async function hiddenRegistryAction(
       userId: created.id,
       nombre: name,
       phone,
-      estudio: policy?.studioName ?? "Pilates Studio",
+      estudio: policy?.studioName ?? DEFAULT_STUDIO_NAME,
     })
 
     // El plan se activa aquí, en el servidor y junto con la cuenta, y no al

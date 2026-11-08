@@ -77,7 +77,7 @@ UPDATE "schedule_slot"
 INSERT INTO "schedule_slot" ("id","class_name","instructor","alternate_instructor","schedule_mode","day_of_week","start_time","end_time","capacity","class_type","is_active","created_at")
 SELECT
   'slot-d' || d.day_of_week || '-t' || replace(t.start_time, ':', ''),
-  'Pilates Reformer',
+  'Studio 57',
   CASE WHEN t.start_time < '12:00' THEN 'Elena Morales' ELSE 'Lucía Paredes' END,
   NULL,
   'fixed',

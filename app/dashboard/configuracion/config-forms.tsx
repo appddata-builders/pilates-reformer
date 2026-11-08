@@ -11,16 +11,17 @@ import { Button } from "@/components/shared/ui/button"
 import { DbActionForm } from "@/components/features/admin/db-action-form"
 import { saveConfigAction } from "./actions"
 import { NavPermissionsForm } from "./nav-permissions-form"
-import type { NavPermissionsMap } from "@/lib/nav-permissions"
+import type { NavPermissionsMap, PermissionsEditor } from "@/lib/nav-permissions"
 
 const CONFIG_TAB_STORAGE_KEY = "pilates_config_tab"
 
-const ADMIN_TABS = ["general", "booking", "alerts", "messages"] as const
-const ROOT_EXTRA_TABS = ["nav", "advanced"] as const
+const BASE_TABS = ["general", "booking", "alerts", "messages"] as const
 
-function validTabsForRole(isRoot: boolean): string[] {
-  if (isRoot) return [...ADMIN_TABS, ...ROOT_EXTRA_TABS]
-  return [...ADMIN_TABS]
+function validTabsForRole(isRoot: boolean, canEditPermissions: boolean): string[] {
+  const tabs: string[] = [...BASE_TABS]
+  if (canEditPermissions) tabs.push("nav")
+  if (isRoot) tabs.push("advanced")
+  return tabs
 }
 
 export type StudioPolicyFormValues = {
@@ -37,8 +38,11 @@ export type StudioPolicyFormValues = {
 export function ConfigFormsClient(props: {
   policy: StudioPolicyFormValues
   isRoot: boolean
+  /** Admin y root: qué columnas de Permisos pueden cambiar. */
+  permissionsEditor: PermissionsEditor
   navPermissions: NavPermissionsMap
 }) {
+  const canEditPermissions = props.permissionsEditor != null
   const [welcomeDraft, setWelcomeDraft] = useState(props.policy.welcomeMessage)
   const [birthdayDraft, setBirthdayDraft] = useState(props.policy.birthdayMessage)
   const [activeTab, setActiveTab] = useState("general")
@@ -50,7 +54,7 @@ export function ConfigFormsClient(props: {
   }, [props.policy.welcomeMessage, props.policy.birthdayMessage])
 
   useEffect(() => {
-    const allowed = validTabsForRole(props.isRoot)
+    const allowed = validTabsForRole(props.isRoot, canEditPermissions)
     let next = "general"
     try {
       const stored = window.localStorage.getItem(CONFIG_TAB_STORAGE_KEY)
@@ -62,7 +66,7 @@ export function ConfigFormsClient(props: {
     }
     setActiveTab(next)
     setTabsReady(true)
-  }, [props.isRoot])
+  }, [props.isRoot, canEditPermissions])
 
   useEffect(() => {
     if (!tabsReady) return
@@ -90,7 +94,7 @@ export function ConfigFormsClient(props: {
           <TabsTrigger value="booking">Políticas de reserva</TabsTrigger>
           <TabsTrigger value="alerts">Alertas</TabsTrigger>
           <TabsTrigger value="messages">Mensajes</TabsTrigger>
-          {props.isRoot ? <TabsTrigger value="nav">Permisos</TabsTrigger> : null}
+          {canEditPermissions ? <TabsTrigger value="nav">Permisos</TabsTrigger> : null}
           {props.isRoot ? <TabsTrigger value="advanced">Avanzado</TabsTrigger> : null}
         </TabsList>
 
@@ -268,14 +272,17 @@ export function ConfigFormsClient(props: {
           </Card>
         </TabsContent>
 
-        {props.isRoot ? (
+        {props.permissionsEditor != null ? (
           <TabsContent className="py-1" value="nav">
             <Card className="border-none shadow-sm max-w-4xl">
               <CardHeader className="py-1">
                 <CardTitle className="text-base font-medium">Permisos de menú por perfil</CardTitle>
               </CardHeader>
               <CardContent className="py-1 pb-6">
-                <NavPermissionsForm permissions={props.navPermissions} />
+                <NavPermissionsForm
+                  permissions={props.navPermissions}
+                  editableRoles={props.permissionsEditor.editableRoles}
+                />
               </CardContent>
             </Card>
           </TabsContent>

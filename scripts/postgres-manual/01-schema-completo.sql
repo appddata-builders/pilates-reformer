@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS "studio_kpi_snapshot" (
 
 CREATE TABLE IF NOT EXISTS "studio_policy" (
 	"id" text PRIMARY KEY DEFAULT 'main' NOT NULL,
-	"studio_name" text DEFAULT 'Pilates Studio' NOT NULL,
+	"studio_name" text DEFAULT 'Studio 57' NOT NULL,
 	"logo_url" text,
 	"max_capacity" integer DEFAULT 10 NOT NULL,
 	"cancel_hours" integer DEFAULT 1 NOT NULL,

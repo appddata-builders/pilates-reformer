@@ -1,4 +1,4 @@
-# Base de datos — Pilates Reformer
+# Base de datos — Studio 57
 
 ## PostgreSQL remoto (producción / staging)
 

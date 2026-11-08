@@ -52,8 +52,8 @@ const DAY_NAMES_FULL = [
 ]
 
 function classTypeLabel(classType: string): string {
-  if (classType === "reformer") return "Pilates Reformer"
-  if (classType === "mat") return "Pilates Mat"
+  if (classType === "reformer") return "Reformer"
+  if (classType === "mat") return "Mat"
   if (classType === "barre") return "Barre"
   if (classType === "mayores_60") return "Especial para mayores de 60 años"
   return "Otro"
@@ -104,22 +104,36 @@ export function SlotCard(props: {
   const [toggleState, toggleAction, togglePending] = useActionState(toggleSlotAction, initial)
   const [weekState, weekAction, weekPending] = useActionState(setSlotWeekAvailabilityAction, initial)
 
+  // Se depende del objeto de estado, no de `success`: tras un primer guardado
+  // `success` se queda en true y un segundo guardado ya no cerraba el diálogo.
   useEffect(() => {
     if (editState.success) setEditOpen(false)
-  }, [editState.success])
+  }, [editState])
 
   useEffect(() => {
     if (deleteState.success) {
       setDeleteOpen(false)
       router.refresh()
     }
-  }, [deleteState.success, router])
+  }, [deleteState, router])
 
   useEffect(() => {
     if (weekState.success) {
       router.refresh()
     }
-  }, [weekState.success, router])
+  }, [weekState, router])
+
+  // Al desactivar (o activar) la clase el pop-up se cierra solo. Se ajusta en el
+  // render al llegar un resultado nuevo; los datos ya los refresca la acción
+  // con revalidatePath.
+  const [handledToggleState, setHandledToggleState] = useState(toggleState)
+  if (toggleState !== handledToggleState) {
+    setHandledToggleState(toggleState)
+    if (toggleState.success) {
+      setDeactivateOpen(false)
+      setEditOpen(false)
+    }
+  }
 
   const slot = props.slot
   const dayName = DAY_NAMES_FULL[slot.dayOfWeek] ?? "—"
@@ -144,8 +158,9 @@ export function SlotCard(props: {
   })
   const disabledThisWeekCount = weekOptions.filter((w) => !w.available).length
   const dimmed = !slot.isActive || props.isPast === true
-  // El tipo repite el nombre en la mayoría de las clases: no lo mostramos dos veces.
+  // Reformer es el tipo de casi todas las clases: sólo se marca cuando es otro.
   const typeLabel = classTypeLabel(slot.classType)
+  const showTypeBadge = slot.classType !== "reformer" && typeLabel !== slot.className
 
   const formValues: SlotFormValues = {
     className: slot.className,
@@ -207,14 +222,9 @@ export function SlotCard(props: {
             </p>
 
             <div className="mt-2 flex flex-wrap gap-1">
-              {typeLabel === slot.className ? null : (
+              {showTypeBadge ? (
                 <Badge className={`border text-[10px] ${classTypeBadgeClass(slot.classType)}`}>
                   {typeLabel}
-                </Badge>
-              )}
-              {slot.scheduleMode === "dual" || slot.scheduleMode === "alternating_weekly" ? (
-                <Badge variant="outline" className="border-sky-200 bg-sky-50 text-[10px] text-sky-800">
-                  2 coaches
                 </Badge>
               ) : null}
               {!slot.isActive ? (
@@ -254,6 +264,7 @@ export function SlotCard(props: {
         title="¿Desactivar esta clase?"
         description={`${titleLine} dejará de aparecer en el horario y no se podrá reservar.`}
         confirmLabel="Sí, desactivar"
+        cancelLabel="Cancelar"
         clientFormAction={toggleAction}
         hiddenFields={[
           { name: "id", value: slot.id },

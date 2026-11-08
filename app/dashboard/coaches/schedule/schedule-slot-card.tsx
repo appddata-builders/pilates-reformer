@@ -15,6 +15,8 @@ export type ScheduleSlotCardData = {
   booked: number
   disabled: boolean
   isPast: boolean
+  /** Día que ya pasó: se puede consultar la lista, pero no cambiar asistencias. */
+  readOnly: boolean
   dateStr: string
 }
 
@@ -71,6 +73,7 @@ export function ScheduleSlotCard(props: { slot: ScheduleSlotCardData; canSeeRost
         scheduleSlotId={s.id}
         bookingDateStr={s.dateStr}
         timeLabel={s.timeLabel}
+        readOnly={s.readOnly}
       />
     </>
   )

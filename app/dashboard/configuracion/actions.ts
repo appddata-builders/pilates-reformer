@@ -7,7 +7,13 @@ import { canManageModule } from "@/lib/staff-access.server"
 import { getDb } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
-import { serializeNavPermissions, type NavPermissionsMap } from "@/lib/nav-permissions"
+import {
+  editableNavRolesFor,
+  mergeEditableNavPermissions,
+  parseNavPermissionsJson,
+  serializeNavPermissions,
+  type NavPermissionsMap,
+} from "@/lib/nav-permissions"
 import { DEFAULT_STUDIO_NAME } from "@/lib/studio-branding"
 
 const tabSchema = z.enum(["general", "booking", "alerts", "messages"])
@@ -43,12 +49,6 @@ async function assertAdminLike() {
   return { session, ok }
 }
 
-async function assertRoot() {
-  const session = await getSession()
-  const ok = session != null && session.user.role === "root"
-  return { session, ok }
-}
-
 function readFormString(formData: FormData, key: string): string {
   const raw = formData.get(key)
   if (typeof raw !== "string") return ""
@@ -80,15 +80,33 @@ export type NavPermissionsActionResult = {
 export async function saveNavPermissionsAction(
   permissions: NavPermissionsMap,
 ): Promise<NavPermissionsActionResult> {
-  const { ok } = await assertRoot()
-  if (!ok) return { success: false, error: "No autorizado" }
+  // Root edita todas las columnas; admin sólo las de coach y alumno. Un coach
+  // con acceso a Configuración no puede tocar permisos.
+  const session = await getSession()
+  const editableRoles = editableNavRolesFor(session?.user.role)
+  if (session == null || editableRoles.length === 0) {
+    return { success: false, error: "No autorizado" }
+  }
 
   const db = getDb()
   await ensureMainStudioPolicy(db)
+  // Se lee directo (sin el respaldo de loadNavPermissions): si la lectura
+  // fallara y se usaran los valores vacíos, se borrarían las columnas de root
+  // y admin al guardar.
+  const [current] = await db
+    .select({ navPermissions: schema.studioPolicy.navPermissions })
+    .from(schema.studioPolicy)
+    .where(eq(schema.studioPolicy.id, "main"))
+    .limit(1)
+  const merged = mergeEditableNavPermissions(
+    parseNavPermissionsJson(current?.navPermissions ?? null),
+    permissions,
+    editableRoles,
+  )
   await db
     .update(schema.studioPolicy)
     .set({
-      navPermissions: serializeNavPermissions(permissions),
+      navPermissions: serializeNavPermissions(merged),
       updatedAt: new Date(),
     })
     .where(eq(schema.studioPolicy.id, "main"))

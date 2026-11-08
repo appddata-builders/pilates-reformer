@@ -57,7 +57,7 @@ ON CONFLICT ("id") DO UPDATE SET "password" = EXCLUDED."password", "updated_at" 
 -- ── 3. studio_policy ──────────────────────────────────────────────────────────
 
 INSERT INTO "studio_policy" ("id","studio_name","brand_color","max_capacity","cancel_hours","cancel_minutes","alert_last_class_threshold","alert_days_before_expiry","maintenance_mode","updated_at")
-VALUES ('main','Pilates Studio','#1b2d6e',10,1,90,2,3,false,now())
+VALUES ('main','Studio 57','#1b2d6e',10,1,90,2,3,false,now())
 ON CONFLICT ("id") DO UPDATE SET "studio_name" = EXCLUDED."studio_name", "updated_at" = now();
 
 -- ── 4. plan ───────────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "schedule_slot" ("id","class_name","instructor","alternate_instructor","schedule_mode","day_of_week","start_time","end_time","capacity","class_type","is_active","created_at")
 SELECT
   'slot-d' || d.day_of_week || '-t' || replace(t.start_time, ':', ''),
-  'Pilates Reformer',
+  'Studio 57',
   CASE WHEN t.start_time < '12:00' THEN 'Elena Morales' ELSE 'Lucía Paredes' END,
   CASE WHEN d.day_of_week = 6 AND t.start_time = '08:00' THEN 'Lucía Paredes' END,
   CASE WHEN d.day_of_week = 6 AND t.start_time = '08:00' THEN 'dual' ELSE 'fixed' END,

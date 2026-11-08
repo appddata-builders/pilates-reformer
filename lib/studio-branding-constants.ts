@@ -1,4 +1,4 @@
-export const DEFAULT_STUDIO_NAME = "Pilates Studio"
+export const DEFAULT_STUDIO_NAME = "Studio 57"
 
 export type StudioBranding = {
   studioName: string

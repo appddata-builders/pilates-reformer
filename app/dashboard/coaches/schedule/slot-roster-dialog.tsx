@@ -19,6 +19,8 @@ export function SlotRosterDialog(props: {
   scheduleSlotId: string
   bookingDateStr: string
   timeLabel: string
+  /** Día que ya pasó: se muestra la lista sin los botones de asistencia. */
+  readOnly?: boolean
 }) {
   const [loaded, setLoaded] = useState<{ key: string; roster: SlotRoster } | null>(null)
   const [revision, setRevision] = useState(0)
@@ -45,7 +47,8 @@ export function SlotRosterDialog(props: {
             {roster?.ok ? roster.className : "Alumn@s inscritas"} · {props.timeLabel}
           </DialogTitle>
           <DialogDescription className="first-letter:uppercase">
-            {roster?.ok ? roster.dateLabel : "Próxima clase"}
+            {roster?.ok ? roster.dateLabel : "Cargando fecha…"}
+            {props.readOnly ? " · Solo lectura" : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -76,11 +79,14 @@ export function SlotRosterDialog(props: {
                       {s.phone ?? "—"}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">{s.email}</p>
-                    {/* Cualquier coach puede cubrir la clase: los botones van siempre. */}
-                    <div className="mt-2">
-                      <AttendanceControls bookingId={s.bookingId} attended={s.attended}
-                        catalog={roster.catalog} onSaved={() => setRevision((value) => value + 1)} />
-                    </div>
+                    {/* Cualquier coach puede cubrir la clase: los botones van en
+                        cualquier día que no haya pasado. */}
+                    {props.readOnly ? null : (
+                      <div className="mt-2">
+                        <AttendanceControls bookingId={s.bookingId} attended={s.attended}
+                          catalog={roster.catalog} onSaved={() => setRevision((value) => value + 1)} />
+                      </div>
+                    )}
                   </div>
                   {s.attended === true ? (
                     <Badge className="border-green-200 bg-green-100 text-[10px] text-green-700">

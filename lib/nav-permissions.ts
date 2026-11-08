@@ -13,6 +13,43 @@ export const ROLE_LABELS: Record<ConfigurableRole, string> = {
 }
 
 export type NavPermissionRow = Record<ConfigurableRole, boolean>
+
+/**
+ * Qué columnas de Permisos puede cambiar cada rol. Root las ve todas; admin
+ * decide qué ven coach y alumno, pero no toca las de root ni la suya, para que
+ * no pueda quitarse acceso a sí misma ni a root.
+ */
+export function editableNavRolesFor(role: string | null | undefined): ConfigurableRole[] {
+  if (role === "root") return [...CONFIGURABLE_ROLES]
+  if (role === "admin") return ["coach", "alumno"]
+  return []
+}
+
+export type PermissionsEditor = { editableRoles: ConfigurableRole[] } | null
+
+export function permissionsEditorFor(role: string | null | undefined): PermissionsEditor {
+  const editableRoles = editableNavRolesFor(role)
+  return editableRoles.length > 0 ? { editableRoles } : null
+}
+
+/** Copia sobre `current` sólo las columnas que este rol puede cambiar. */
+export function mergeEditableNavPermissions(
+  current: NavPermissionsMap,
+  submitted: NavPermissionsMap,
+  editableRoles: readonly ConfigurableRole[],
+): NavPermissionsMap {
+  const out: NavPermissionsMap = {}
+  for (const item of mainNavItems) {
+    const base = current[item.key] ?? { root: false, admin: false, coach: false, alumno: false }
+    const row = { ...base }
+    const incoming = submitted?.[item.key]
+    for (const role of editableRoles) {
+      if (incoming != null && typeof incoming[role] === "boolean") row[role] = incoming[role]
+    }
+    out[item.key] = row
+  }
+  return out
+}
 export type NavPermissionsMap = Record<string, NavPermissionRow>
 
 const ROOT_ALWAYS_KEYS = new Set(["dashboard", "configuracion"])

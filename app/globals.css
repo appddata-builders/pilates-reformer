@@ -324,3 +324,13 @@
   border-color: #ba7517 !important;
   color: #ffffff !important;
 }
+/* Días pasados: de solo lectura, se ven apagados. */
+.admin-calendar .fc .fc-daygrid-day.fc-day-past,
+.admin-calendar .fc .fc-timegrid-col.fc-day-past {
+  background-color: rgba(27, 26, 24, 0.035);
+}
+.admin-calendar .fc .fc-day-past .fc-daygrid-day-number,
+.admin-calendar .fc .fc-day-past .fc-daygrid-event,
+.admin-calendar .fc .fc-day-past .fc-timegrid-event {
+  opacity: 0.6;
+}

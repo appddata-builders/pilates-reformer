@@ -2,7 +2,7 @@ export const siteNav = [
   { href: "/", label: "Inicio" },
 ] as const
 
-export const siteBrandName = "Studio 57 · Pilates Reformer"
+export const siteBrandName = "Studio 57"
 export const siteBrandShort = "Studio 57"
 export const siteInstagramHandle = "studio57_lzc_pilatesreformer"
 export const siteWhatsAppUrl = "https://wa.me/527531304624"

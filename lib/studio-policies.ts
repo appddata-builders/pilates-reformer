@@ -15,7 +15,7 @@ export const STUDIO_POLICIES_SUBTITLE =
 export const STUDIO_POLICIES_VERSION = "Versión: 15/01/2026 · Sucursal: Lázaro Cárdenas"
 
 export const STUDIO_POLICIES_INTRO =
-  "Bienvenido(a) a Studio 57 Pilates Reformer. Nuestro propósito es ofrecer un espacio seguro, respetuoso y profesional para disfrutar del movimiento. Te invitamos a conocer las siguientes políticas antes de crear tu cuenta y reservar clases."
+  "Bienvenido(a) a Studio 57. Nuestro propósito es ofrecer un espacio seguro, respetuoso y profesional para disfrutar del movimiento. Te invitamos a conocer las siguientes políticas antes de crear tu cuenta y reservar clases."
 
 export const STUDIO_POLICY_SECTIONS: StudioPolicySection[] = [
   {

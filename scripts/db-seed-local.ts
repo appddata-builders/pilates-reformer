@@ -78,7 +78,7 @@ function main() {
       const isDual = day.dayOfWeek === 6 && startTime === "08:00"
       const values = {
         id: `slot-d${day.dayOfWeek}-t${startTime.replace(":", "")}`,
-        className: "Pilates Reformer",
+        className: "Studio 57",
         // Sin instructor: se asigna desde el panel cuando hay coaches reales.
         instructor: null,
         alternateInstructor: null,

@@ -215,7 +215,7 @@ export const coupon = sqliteTable("coupon", {
 
 export const studioPolicy = sqliteTable("studio_policy", {
   id: text("id").primaryKey().default("main"),
-  studioName: text("studio_name").notNull().default("Pilates Studio"),
+  studioName: text("studio_name").notNull().default("Studio 57"),
   logoUrl: text("logo_url"),
   cancelMinutes: integer("cancel_minutes").notNull().default(90),
   alertLastClassThreshold: integer("alert_last_class_threshold").notNull().default(2),

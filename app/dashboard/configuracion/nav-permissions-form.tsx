@@ -22,7 +22,13 @@ import {
 import { useDbActionFeedback } from "@/components/features/admin/db-action-feedback"
 import { saveNavPermissionsAction } from "./actions"
 
-export function NavPermissionsForm(props: { permissions: NavPermissionsMap }) {
+export function NavPermissionsForm(props: {
+  permissions: NavPermissionsMap
+  /** Root ve y cambia las 4 columnas; admin sólo las de coach y alumno. */
+  editableRoles: ConfigurableRole[]
+}) {
+  const columns = CONFIGURABLE_ROLES.filter((role) => props.editableRoles.includes(role))
+  const editsAllRoles = columns.length === CONFIGURABLE_ROLES.length
   const { showDbActionFeedback } = useDbActionFeedback()
   const router = useRouter()
   const [permissions, setPermissions] = useState<NavPermissionsMap>(props.permissions)
@@ -60,9 +66,9 @@ export function NavPermissionsForm(props: { permissions: NavPermissionsMap }) {
   return (
     <div className="flex flex-col gap-4 py-1">
       <p className="text-sm text-muted-foreground py-1">
-        Marca qué secciones del menú lateral puede ver cada perfil. Tras reiniciar la base (seed),
-        ningún perfil tiene permisos hasta guardar aquí. Root siempre puede entrar a Dashboard y
-        Configuración aunque no estén marcados.
+        {editsAllRoles
+          ? "Marca qué secciones del menú lateral puede ver cada perfil. Tras reiniciar la base (seed), ningún perfil tiene permisos hasta guardar aquí. Root siempre puede entrar a Dashboard y Configuración aunque no estén marcados."
+          : "Marca qué secciones del menú lateral pueden ver los coaches y los alumnos. Los coaches, además, podrán hacer cambios en las secciones que tengan marcadas."}
       </p>
       <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
@@ -71,7 +77,7 @@ export function NavPermissionsForm(props: { permissions: NavPermissionsMap }) {
               <TableHead className="py-1 text-muted-foreground font-normal text-sm min-w-[160px]">
                 Sección
               </TableHead>
-              {CONFIGURABLE_ROLES.map((role) => (
+              {columns.map((role) => (
                 <TableHead
                   key={role}
                   className="py-1 text-muted-foreground font-normal text-sm text-center w-[88px]"
@@ -89,7 +95,7 @@ export function NavPermissionsForm(props: { permissions: NavPermissionsMap }) {
               return (
                 <TableRow key={item.key} className="border-b last:border-0">
                   <TableCell className="py-1 font-medium text-sm">{item.title}</TableCell>
-                  {CONFIGURABLE_ROLES.map((role) => {
+                  {columns.map((role) => {
                     const locked = role === "root" && rootLocked
                     return (
                       <TableCell key={role} className="text-center py-1">
